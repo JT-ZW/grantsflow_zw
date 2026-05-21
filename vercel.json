@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/flag-milestones",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/flag-documents",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}

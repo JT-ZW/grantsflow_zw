@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -47,19 +48,14 @@ export async function submitExpense(formData: FormData) {
 
   const { grant_id, milestone_id, category, description, amount, currency_code, expense_date } = parsed.data;
 
-  // Ownership verification
+  // Ownership verification — RLS ensures only accessible grants are returned
   const { data: grant } = await supabase
     .from("grants")
-    .select("id, awardees!inner(user_id)")
+    .select("id")
     .eq("id", grant_id)
     .single();
 
-  const grantData = grant as unknown as {
-    id: string;
-    awardees: { user_id: string };
-  } | null;
-
-  if (!grantData || grantData.awardees.user_id !== user.id) return;
+  if (!grant) return;
 
   // Handle receipt file upload to storage
   let receiptStoragePath: string | null = null;
@@ -100,13 +96,15 @@ export async function submitExpense(formData: FormData) {
       new_data: { grant_id, category, amount, currency_code, expense_date },
     });
 
-    const { data: staffProfiles } = await supabase
+    // Use admin client — notifications RLS has no INSERT policy for awardees
+    const adminClient = createAdminClient();
+    const { data: staffProfiles } = await adminClient
       .from("profiles")
       .select("id")
       .in("role", ["admin", "finance_officer", "program_manager"]);
 
     if (staffProfiles && staffProfiles.length > 0) {
-      await supabase.from("notifications").insert(
+      await adminClient.from("notifications").insert(
         staffProfiles.map((p) => ({
           user_id: p.id,
           title: "New Expense Submitted",

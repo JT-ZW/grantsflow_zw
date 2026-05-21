@@ -332,12 +332,12 @@ export default async function AnalyticsPage() {
               const end = new Date(g.end_date);
               const days = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
               return (
-                <div key={g.id} className="flex items-center justify-between py-2">
+                <div key={g.id} className="flex flex-col gap-1 py-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-medium text-orange-900">{g.title}</p>
                     <p className="text-xs text-orange-700">{awardeeData?.full_name}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="sm:text-right">
                     <p className="text-sm font-semibold text-orange-800">{days}d left</p>
                     <p className="text-xs text-orange-600">{end.toLocaleDateString()}</p>
                   </div>

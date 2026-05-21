@@ -1,20 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
-import { updateGrantApproval } from "./actions";
-
-const MILESTONE_STATUS_STYLES: Record<string, string> = {
-  not_started: "bg-gray-100 text-gray-600",
-  in_progress: "bg-blue-100 text-blue-700",
-  completed: "bg-green-100 text-green-700",
-  delayed: "bg-red-100 text-red-700",
-};
-
-const MILESTONE_STATUS_LABELS: Record<string, string> = {
-  not_started: "Not Started",
-  in_progress: "In Progress",
-  completed: "Completed",
-  delayed: "Delayed",
-};
+import { reviewMilestoneProposal, updateGrantApproval } from "./actions";
+import { MilestoneTimeline } from "./MilestoneTimeline";
+import { ImpactPanel } from "./ImpactPanel";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -32,7 +20,7 @@ export default async function AwardeeDetailPage({ params }: PageProps) {
         *,
         milestones (
           *,
-          milestone_updates ( id, note, status_at, created_at )
+          milestone_updates ( id, note, status_at, completion_pct, planned_next, blockers, created_at )
         )
       )
     `)
@@ -42,15 +30,53 @@ export default async function AwardeeDetailPage({ params }: PageProps) {
   if (!awardee) notFound();
 
   const grant = awardee.grants?.[0];
-  const milestones = grant?.milestones?.sort(
+  const allMilestones = (grant?.milestones ?? []).sort(
     (a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order
-  ) ?? [];
+  );
+  // Separate admin-confirmed milestones from awardee proposals
+  const milestones        = allMilestones.filter((m: { proposal_status?: string | null }) => !m.proposal_status || m.proposal_status === "approved");
+  const pendingProposals  = allMilestones.filter((m: { proposal_status?: string | null }) => m.proposal_status === "pending_approval");
+  const reviewedProposals = allMilestones.filter((m: { proposal_status?: string | null }) => m.proposal_status === "rejected");
+
+  // ── Impact indicators ────────────────────────────────────────────────────
+  const indicators = grant
+    ? await supabase
+        .from("grant_impact_indicators")
+        .select("*, impact_submissions(id, actual_value, note, submitted_at)")
+        .eq("grant_id", grant.id)
+        .order("sort_order")
+        .then(({ data }) =>
+          (data ?? []).map((ind) => ({
+            ...ind,
+            impact_submissions: [...(ind.impact_submissions ?? [])].sort(
+              (a: { submitted_at: string }, b: { submitted_at: string }) =>
+                new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
+            ),
+          }))
+        )
+    : [];
+
+  // ── Health bar stats ─────────────────────────────────────────────────────
+  const totalMs        = milestones.length;
+  const completedMs    = milestones.filter((m: { status: string }) => m.status === "completed").length;
+  const delayedMs      = milestones.filter((m: { status: string }) => m.status === "delayed").length;
+  const overdueMs      = milestones.filter(
+    (m: { status: string; due_date: string }) =>
+      m.status !== "completed" && m.status !== "delayed" && new Date(m.due_date) < new Date()
+  ).length;
+  const milestoneCompletionPct = totalMs > 0 ? Math.round((completedMs / totalMs) * 100) : 0;
+  const riskScore = totalMs > 0
+    ? Math.round((delayedMs / totalMs) * 60 + (overdueMs / totalMs) * 20)
+    : 0;
+  const daysRemaining = grant
+    ? Math.ceil((new Date(grant.end_date).getTime() - Date.now()) / 86_400_000)
+    : null;
 
   return (
     <div className="space-y-6">
       {/* Awardee header */}
       <div className="rounded-xl border border-gray-200 bg-white p-6">
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{awardee.full_name}</h1>
             <p className="text-sm text-gray-500 mt-0.5">{awardee.email}</p>
@@ -60,7 +86,7 @@ export default async function AwardeeDetailPage({ params }: PageProps) {
               </p>
             )}
           </div>
-          <span className="rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-500 capitalize">
+          <span className="self-start rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-500 capitalize">
             {awardee.awardee_type}
           </span>
         </div>
@@ -92,6 +118,102 @@ export default async function AwardeeDetailPage({ params }: PageProps) {
           )}
         </dl>
       </div>
+
+      {/* Project Health Bar */}
+      {grant && totalMs > 0 && (
+        <div className="rounded-xl border border-gray-200 bg-white p-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">Project Health</h2>
+
+          {/* Progress bar */}
+          <div className="mb-5">
+            <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+              <span>Milestone completion</span>
+              <span className="font-semibold text-gray-700">{completedMs} / {totalMs} done ({milestoneCompletionPct}%)</span>
+            </div>
+            <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  milestoneCompletionPct >= 80
+                    ? "bg-green-500"
+                    : milestoneCompletionPct >= 50
+                    ? "bg-blue-500"
+                    : "bg-amber-400"
+                }`}
+                style={{ width: `${milestoneCompletionPct}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Stat pills */}
+          <div className="flex flex-wrap gap-3">
+            {/* Days remaining */}
+            {daysRemaining !== null && (
+              <div className={`flex items-center gap-2 rounded-lg px-4 py-2.5 border ${
+                daysRemaining < 0
+                  ? "bg-red-50 border-red-200"
+                  : daysRemaining <= 30
+                  ? "bg-amber-50 border-amber-200"
+                  : "bg-green-50 border-green-200"
+              }`}>
+                <div>
+                  <p className="text-xs text-gray-500">Days remaining</p>
+                  <p className={`text-lg font-bold ${
+                    daysRemaining < 0
+                      ? "text-red-600"
+                      : daysRemaining <= 30
+                      ? "text-amber-600"
+                      : "text-green-600"
+                  }`}>
+                    {daysRemaining < 0 ? `${Math.abs(daysRemaining)} overdue` : daysRemaining}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Overdue */}
+            <div className={`flex items-center gap-2 rounded-lg px-4 py-2.5 border ${
+              overdueMs > 0 ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"
+            }`}>
+              <div>
+                <p className="text-xs text-gray-500">Overdue milestones</p>
+                <p className={`text-lg font-bold ${overdueMs > 0 ? "text-red-600" : "text-gray-400"}`}>
+                  {overdueMs}
+                </p>
+              </div>
+            </div>
+
+            {/* Delayed */}
+            <div className={`flex items-center gap-2 rounded-lg px-4 py-2.5 border ${
+              delayedMs > 0 ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-200"
+            }`}>
+              <div>
+                <p className="text-xs text-gray-500">Marked delayed</p>
+                <p className={`text-lg font-bold ${delayedMs > 0 ? "text-amber-600" : "text-gray-400"}`}>
+                  {delayedMs}
+                </p>
+              </div>
+            </div>
+
+            {/* Risk */}
+            <div className={`flex items-center gap-2 rounded-lg px-4 py-2.5 border ${
+              riskScore >= 60
+                ? "bg-red-50 border-red-200"
+                : riskScore >= 30
+                ? "bg-yellow-50 border-yellow-200"
+                : "bg-green-50 border-green-200"
+            }`}>
+              <div>
+                <p className="text-xs text-gray-500">Risk level</p>
+                <p className={`text-lg font-bold ${
+                  riskScore >= 60 ? "text-red-600" : riskScore >= 30 ? "text-yellow-600" : "text-green-600"
+                }`}>
+                  {riskScore >= 60 ? "High" : riskScore >= 30 ? "Medium" : "Low"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Grant Details */}
       {grant ? (
@@ -149,87 +271,121 @@ export default async function AwardeeDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      {/* Milestones */}
+      {/* Impact */}
       {grant && (
         <div className="rounded-xl border border-gray-200 bg-white p-6">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">
-            Milestones
-            <span className="ml-2 text-sm font-normal text-gray-400">
-              ({milestones.length})
-            </span>
-          </h2>
+          <h2 className="text-base font-semibold text-gray-900 mb-4">Impact</h2>
+          <ImpactPanel grant={grant} indicators={indicators} awardeeId={awardee.id} />
+        </div>
+      )}
 
-          {milestones.length === 0 ? (
-            <p className="text-sm text-gray-400">No milestones defined.</p>
-          ) : (
-            <div className="space-y-3">
-              {milestones.map(
-                (m: {
-                  id: string;
-                  title: string;
-                  due_date: string;
-                  status: string;
-                  deliverables?: string;
-                  description?: string;
-                  progress_notes?: string | null;
-                  milestone_updates?: { id: string; note: string; status_at: string; created_at: string }[];
-                }) => (
-                  <div
-                    key={m.id}
-                    className="rounded-lg border border-gray-100 p-4"
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{m.title}</p>
-                        {m.deliverables && (
-                          <p className="text-xs text-gray-500 mt-0.5">{m.deliverables}</p>
-                        )}
-                        {m.progress_notes && (
-                          <p className="text-xs text-gray-500 mt-1 italic border-l-2 border-blue-200 pl-2">
-                            Latest: {m.progress_notes}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                            MILESTONE_STATUS_STYLES[m.status] ?? "bg-gray-100 text-gray-600"
-                          }`}
-                        >
-                          {MILESTONE_STATUS_LABELS[m.status] ?? m.status}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          Due {new Date(m.due_date).toLocaleDateString("en-ZA")}
-                        </span>
-                      </div>
+      {/* Milestone Proposals (awardee-submitted) */}
+      {grant && (pendingProposals.length > 0 || reviewedProposals.length > 0) && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 overflow-hidden">
+          <div className="px-6 py-4 border-b border-amber-200 flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-amber-900">Milestone Proposals</h2>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Milestones proposed by the awardee — review and approve or reject each one.
+              </p>
+            </div>
+            {pendingProposals.length > 0 && (
+              <span className="rounded-full bg-amber-200 text-amber-900 text-xs font-semibold px-2.5 py-0.5">
+                {pendingProposals.length} pending
+              </span>
+            )}
+          </div>
+
+          <div className="divide-y divide-amber-100">
+            {[...pendingProposals, ...reviewedProposals].map((m: {
+              id: string;
+              title: string;
+              description: string | null;
+              deliverables: string | null;
+              due_date: string;
+              proposal_status: string;
+              proposal_notes: string | null;
+            }) => (
+              <div key={m.id} className="px-6 py-5 bg-white">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <p className="text-sm font-semibold text-gray-900">{m.title}</p>
+                      {m.proposal_status === "pending_approval" && (
+                        <span className="rounded-full bg-yellow-100 text-yellow-700 text-xs font-medium px-2 py-0.5">Pending</span>
+                      )}
+                      {m.proposal_status === "rejected" && (
+                        <span className="rounded-full bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5">Rejected</span>
+                      )}
                     </div>
-
-                    {/* Update history */}
-                    {(m.milestone_updates ?? []).length > 0 && (
-                      <details className="mt-3 border-t border-gray-50 pt-2">
-                        <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-600 select-none">
-                          {m.milestone_updates!.length} progress update{m.milestone_updates!.length !== 1 ? "s" : ""}
-                        </summary>
-                        <div className="mt-2 space-y-1.5">
-                          {[...m.milestone_updates!]
-                            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                            .map((u) => (
-                              <div key={u.id} className="rounded bg-gray-50 px-3 py-2">
-                                <div className="flex justify-between text-xs text-gray-400 mb-0.5">
-                                  <span className="capitalize">{u.status_at.replace("_", " ")}</span>
-                                  <span>{new Date(u.created_at).toLocaleDateString("en-ZA")}</span>
-                                </div>
-                                <p className="text-xs text-gray-700">{u.note}</p>
-                              </div>
-                            ))}
-                        </div>
-                      </details>
+                    {m.description && (
+                      <p className="text-xs text-gray-500 mb-1">{m.description}</p>
+                    )}
+                    {m.deliverables && (
+                      <p className="text-xs text-gray-400">Deliverables: {m.deliverables}</p>
+                    )}
+                    {m.proposal_notes && (
+                      <p className="text-xs text-red-600 mt-1 italic">Your note: {m.proposal_notes}</p>
                     )}
                   </div>
-                )
-              )}
-            </div>
-          )}
+                  <div className="shrink-0 text-right">
+                    <p className="text-xs text-gray-400">Due</p>
+                    <p className="text-xs font-medium text-gray-700">
+                      {new Date(m.due_date + "T12:00:00").toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
+                    </p>
+                  </div>
+                </div>
+
+                {m.proposal_status === "pending_approval" && (
+                  <form action={reviewMilestoneProposal} className="mt-4 border-t border-gray-100 pt-4">
+                    <input type="hidden" name="milestone_id" value={m.id} />
+                    <input type="hidden" name="awardee_id" value={awardee.id} />
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input
+                        name="proposal_notes"
+                        type="text"
+                        placeholder="Optional rejection reason…"
+                        className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs focus:border-[#6b1a2a] focus:outline-none focus:ring-1 focus:ring-[#6b1a2a]"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          name="decision"
+                          value="approved"
+                          className="rounded-lg bg-green-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-green-700 transition-colors"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="submit"
+                          name="decision"
+                          value="rejected"
+                          className="rounded-lg bg-red-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Milestones — horizontal timeline */}
+      {grant && (
+        <div className="rounded-xl border border-gray-200 bg-white p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-base font-semibold text-gray-900">
+              Milestones
+              <span className="ml-2 text-sm font-normal text-gray-400">
+                ({milestones.length})
+              </span>
+            </h2>
+          </div>
+          <MilestoneTimeline milestones={milestones} awardeeId={awardee.id} />
         </div>
       )}
     </div>

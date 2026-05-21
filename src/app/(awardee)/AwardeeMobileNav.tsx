@@ -1,0 +1,73 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { logout } from "@/app/auth/actions";
+
+const navItems = [
+  { label: "Grant",         href: "/portal" },
+  { label: "Project",       href: "/portal/project" },
+  { label: "Finances",      href: "/portal/finances" },
+  { label: "Amendments",    href: "/portal/amendments" },
+  { label: "Disbursements", href: "/portal/disbursements" },
+  { label: "Reports",       href: "/portal/reports" },
+  { label: "Documents",     href: "/portal/documents" },
+  { label: "Messages",      href: "/portal/messages" },
+];
+
+export default function AwardeeMobileNav() {
+  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="lg:hidden rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+        aria-label="Open menu"
+      >
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      {open && <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setOpen(false)} />}
+
+      <div className={`fixed top-0 left-0 z-50 h-full w-64 max-w-[85vw] bg-white shadow-xl transform transition-transform duration-300 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-4">
+          <img src="/logo.png" alt="GrantsFlow" className="h-8 w-auto" />
+          <button onClick={() => setOpen(false)} className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100" aria-label="Close menu">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <nav className="flex flex-col gap-1 p-3">
+          {navItems.map((item) => {
+            const isActive = item.href === "/portal" ? pathname === "/portal" : pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className={`rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${isActive ? "bg-[#6b1a2a] text-white" : "text-gray-700 hover:bg-gray-100"}`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="absolute bottom-0 left-0 right-0 border-t border-gray-200 p-3">
+          <form action={logout}>
+            <button type="submit" className="w-full rounded-lg px-4 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
+              Sign out
+            </button>
+          </form>
+        </div>
+      </div>
+    </>
+  );
+}

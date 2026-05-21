@@ -12,12 +12,16 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
+/* Dark mode disabled intentionally — GrantFlow uses a fixed brand colour scheme
+   (#6b1a2a maroon). Enabling dark mode would invert the branded UI.
+   If dark mode is added in future, use the Tailwind `dark:` variant system
+   rather than the CSS media query so colours can be controlled per-component. */
+/* @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
-}
+} */
 
 body {
   background: var(--background);

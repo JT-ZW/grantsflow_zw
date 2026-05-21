@@ -86,7 +86,7 @@ export default async function ReportsPage() {
               const grants = a.grants as { id: string; title: string; status: string }[] | null;
               const grant = grants?.[0];
               return (
-                <div key={a.id} className="flex items-center justify-between py-3">
+                <div key={a.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-900">{a.full_name}</p>
                     <p className="text-xs text-gray-400 mt-0.5">

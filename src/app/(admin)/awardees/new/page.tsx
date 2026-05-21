@@ -1,6 +1,29 @@
+import { createClient } from "@/lib/supabase/server";
 import OnboardingForm from "./OnboardingForm";
 
-export default function NewAwardeePage() {
+export default async function NewAwardeePage() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("programmes")
+    .select("id, name, currency_code, total_budget, programme_categories(id, name, sort_order)")
+    .order("created_at", { ascending: false });
+
+  const programmes = (data ?? []).map((p: {
+    id: string;
+    name: string;
+    currency_code: string;
+    total_budget: number | null;
+    programme_categories: { id: string; name: string; sort_order: number }[] | null;
+  }) => ({
+    id: p.id,
+    name: p.name,
+    currency_code: p.currency_code,
+    total_budget: p.total_budget,
+    categories: (p.programme_categories ?? [])
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((c) => ({ id: c.id, name: c.name })),
+  }));
+
   return (
     <div>
       <div className="mb-8">
@@ -9,7 +32,7 @@ export default function NewAwardeePage() {
           Manually onboard a grant recipient and set up their project.
         </p>
       </div>
-      <OnboardingForm />
+      <OnboardingForm programmes={programmes} />
     </div>
   );
 }

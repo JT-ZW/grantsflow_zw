@@ -11,8 +11,7 @@ ALTER TABLE grants
 
 -- Migrate existing data sensibly
 UPDATE grants SET approval_status = 'approved'   WHERE status IN ('active','completed') AND approval_status = 'approved';
-UPDATE grants SET approval_status = 'rejected'   WHERE status = 'rejected';
-UPDATE grants SET approval_status = 'submitted'  WHERE status = 'pending' AND approval_status = 'approved';
+UPDATE grants SET approval_status = 'submitted'  WHERE status = 'suspended' AND approval_status = 'approved';
 
 -- Optional: add a notes field for rejection reason
 ALTER TABLE grants ADD COLUMN IF NOT EXISTS approval_notes TEXT;

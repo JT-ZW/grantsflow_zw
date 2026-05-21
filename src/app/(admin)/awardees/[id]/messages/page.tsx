@@ -46,7 +46,7 @@ export default async function AdminMessagesPage({
   }
 
   // Mark unread messages as read by admin
-  await markMessagesReadByAdmin(grant.id, awardeeId);
+  await markMessagesReadByAdmin(grant.id);
 
   const { data: msgs } = await supabase
     .from("messages")

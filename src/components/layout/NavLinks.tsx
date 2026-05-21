@@ -9,7 +9,9 @@ const navItems = [
   { label: "Awardees", href: "/awardees" },
   { label: "Finances", href: "/finances" },
   { label: "Analytics", href: "/analytics" },
+  { label: "Impact", href: "/impact" },
   { label: "Reports", href: "/reports" },
+  { label: "Compliance", href: "/compliance" },
   { label: "Audit Log", href: "/audit" },
   { label: "Users", href: "/users" },
 ];

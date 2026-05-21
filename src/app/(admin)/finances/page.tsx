@@ -149,7 +149,7 @@ export default async function FinancesPage() {
               return (
                 <div
                   key={e.id}
-                  className="flex items-center justify-between rounded-lg bg-white border border-yellow-100 px-4 py-3"
+                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-lg bg-white border border-yellow-100 px-4 py-3"
                 >
                   <div>
                     <p className="text-sm font-medium text-gray-900">{e.description}</p>
@@ -188,7 +188,8 @@ export default async function FinancesPage() {
         {awardeeRows.length === 0 ? (
           <p className="text-sm text-gray-400">No awardees with grants yet.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto -mx-6">
+            <div className="inline-block min-w-full align-middle px-6">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100">
@@ -252,6 +253,7 @@ export default async function FinancesPage() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>

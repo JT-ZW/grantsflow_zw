@@ -22,15 +22,14 @@ export async function awardeeSendMessage(formData: FormData): Promise<void> {
 
   const { grant_id, body } = parsed.data;
 
-  // Verify awardee owns this grant
+  // Ownership verification — RLS ensures only accessible grants are returned
   const { data: grant } = await supabase
     .from("grants")
-    .select("id, awardees!inner(user_id)")
+    .select("id")
     .eq("id", grant_id)
     .single();
 
-  const g = grant as unknown as { id: string; awardees: { user_id: string } } | null;
-  if (!g || g.awardees.user_id !== user.id) return;
+  if (!grant) return;
 
   await supabase.from("messages").insert({ grant_id, sender_id: user.id, body });
 

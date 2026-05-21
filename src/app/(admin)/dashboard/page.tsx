@@ -111,7 +111,7 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -120,7 +120,7 @@ export default async function DashboardPage() {
         </div>
         <Link
           href="/awardees/new"
-          className="rounded-lg bg-[#6b1a2a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#5a1522] transition-colors shadow-sm"
+          className="self-start rounded-lg bg-[#6b1a2a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#5a1522] transition-colors shadow-sm"
         >
           + Add Awardee &amp; Grant
         </Link>
@@ -321,12 +321,12 @@ export default async function DashboardPage() {
       </div>
 
       {/* Quick Actions bar */}
-      <div className="rounded-xl border border-gray-200 bg-gradient-to-r from-[#6b1a2a] to-[#8b2535] p-5 flex items-center justify-between">
-        <div>
+      <div className="rounded-xl border border-gray-200 bg-gradient-to-r from-[#6b1a2a] to-[#8b2535] p-5">
+        <div className="mb-3">
           <p className="text-sm font-semibold text-white">Quick Actions</p>
           <p className="text-xs text-red-200 mt-0.5">Common tasks at a glance</p>
         </div>
-        <div className="flex gap-3 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
           <Link href="/awardees/new" className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-[#6b1a2a] hover:bg-red-50 transition-colors">
             + Add Awardee
           </Link>

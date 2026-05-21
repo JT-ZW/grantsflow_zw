@@ -1,18 +1,33 @@
 import { createClient } from "@/lib/supabase/server";
 
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
-  "awardee.created":        { label: "Awardee Created",        color: "bg-blue-100 text-blue-700" },
-  "grant.created":          { label: "Grant Created",           color: "bg-blue-100 text-blue-700" },
-  "grant.status_changed":   { label: "Grant Status Changed",    color: "bg-purple-100 text-purple-700" },
-  "milestone.created":      { label: "Milestone Added",         color: "bg-blue-100 text-blue-700" },
+  "awardee.created":        { label: "Awardee Created",          color: "bg-blue-100 text-blue-700" },
+  "grant.created":          { label: "Grant Created",             color: "bg-blue-100 text-blue-700" },
+  "grant.status_changed":   { label: "Grant Status Changed",      color: "bg-purple-100 text-purple-700" },
+  "milestone.created":      { label: "Milestone Added",           color: "bg-blue-100 text-blue-700" },
   "milestone.status_changed": { label: "Milestone Status Changed", color: "bg-purple-100 text-purple-700" },
-  "budget.created":         { label: "Budget Line Added",       color: "bg-green-100 text-green-700" },
-  "budget.approved":        { label: "Budget Approved",         color: "bg-green-100 text-green-700" },
-  "budget.unapproved":      { label: "Budget Unapproved",       color: "bg-yellow-100 text-yellow-700" },
-  "disbursement.recorded":  { label: "Disbursement Recorded",   color: "bg-green-100 text-green-700" },
-  "expense.submitted":      { label: "Expense Submitted",       color: "bg-yellow-100 text-yellow-700" },
-  "expense.approved":       { label: "Expense Approved",        color: "bg-green-100 text-green-700" },
-  "expense.rejected":       { label: "Expense Rejected",        color: "bg-red-100 text-red-700" },
+  "budget.created":         { label: "Budget Line Added",         color: "bg-green-100 text-green-700" },
+  "budget.approved":        { label: "Budget Approved",           color: "bg-green-100 text-green-700" },
+  "budget.unapproved":      { label: "Budget Unapproved",         color: "bg-yellow-100 text-yellow-700" },
+  "disbursement.recorded":  { label: "Disbursement Recorded",     color: "bg-green-100 text-green-700" },
+  "disbursement.approved":  { label: "Disbursement Approved",     color: "bg-blue-100 text-blue-700" },
+  "disbursement.rejected":  { label: "Disbursement Rejected",     color: "bg-red-100 text-red-700" },
+  "disbursement.processed": { label: "Disbursement Processed",    color: "bg-green-100 text-green-700" },
+  "expense.submitted":      { label: "Expense Submitted",         color: "bg-yellow-100 text-yellow-700" },
+  "expense.approved":       { label: "Expense Approved",          color: "bg-green-100 text-green-700" },
+  "expense.rejected":       { label: "Expense Rejected",          color: "bg-red-100 text-red-700" },
+  "document.uploaded":      { label: "Document Uploaded",         color: "bg-blue-100 text-blue-700" },
+  "document.deleted":       { label: "Document Deleted",          color: "bg-red-100 text-red-700" },
+  "document.expiry_set":    { label: "Document Expiry Set",       color: "bg-purple-100 text-purple-700" },
+  "amendment.submitted":    { label: "Amendment Submitted",       color: "bg-yellow-100 text-yellow-700" },
+  "amendment.approved":     { label: "Amendment Approved",        color: "bg-green-100 text-green-700" },
+  "amendment.rejected":     { label: "Amendment Rejected",        color: "bg-red-100 text-red-700" },
+  "report.submitted":       { label: "Report Submitted",          color: "bg-yellow-100 text-yellow-700" },
+  "report.approved":        { label: "Report Approved",           color: "bg-green-100 text-green-700" },
+  "report.revision_requested": { label: "Report Revision Requested", color: "bg-yellow-100 text-yellow-700" },
+  "impact.updated":         { label: "Impact Updated",            color: "bg-purple-100 text-purple-700" },
+  "user.invited":           { label: "User Invited",              color: "bg-blue-100 text-blue-700" },
+  "user.role_changed":      { label: "User Role Changed",         color: "bg-purple-100 text-purple-700" },
 };
 
 function fmtDatetime(d: string) {
@@ -125,7 +140,8 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
           <div className="p-10 text-center text-sm text-gray-400">No log entries found.</div>
         ) : (
           <>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Time</th>
@@ -202,6 +218,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                 })}
               </tbody>
             </table>
+            </div>
 
             {/* Pagination */}
             {totalPages > 1 && (

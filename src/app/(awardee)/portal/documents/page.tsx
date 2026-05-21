@@ -11,8 +11,35 @@ type DocumentRow = {
   description: string | null;
   created_at: string;
   milestone_id: string | null;
+  is_compliance: boolean | null;
+  document_type: string | null;
+  expires_at: string | null;
   profiles: { full_name: string | null; email: string } | null;
 };
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  ethics_clearance:       "Ethics Clearance",
+  tax_clearance:          "Tax Clearance",
+  institutional_agreement:"Institutional Agreement",
+  research_permit:        "Research Permit",
+  financial_report:       "Financial Report",
+  identity_document:      "Identity Document",
+  insurance:              "Insurance",
+  other:                  "Other",
+};
+
+function expiryBadge(expiresAt: string | null) {
+  if (!expiresAt) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const exp = new Date(expiresAt + "T00:00:00");
+  const days = Math.ceil((exp.getTime() - today.getTime()) / 86_400_000);
+  if (days < 0)
+    return <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">Expired {Math.abs(days)}d ago</span>;
+  if (days <= 30)
+    return <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">Expires in {days}d</span>;
+  return <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Valid · {exp.toLocaleDateString("en-ZA")}</span>;
+}
 
 function formatBytes(bytes: number | null) {
   if (!bytes) return "—";
@@ -63,7 +90,7 @@ export default async function PortalDocumentsPage() {
     ? await supabase
         .from("documents")
         .select(
-          "id, name, storage_path, mime_type, size_bytes, description, created_at, milestone_id, profiles(full_name, email)"
+          "id, name, storage_path, mime_type, size_bytes, description, created_at, milestone_id, is_compliance, document_type, expires_at, profiles(full_name, email)"
         )
         .eq("grant_id", grant.id)
         .order("created_at", { ascending: false })
@@ -89,7 +116,6 @@ export default async function PortalDocumentsPage() {
           </summary>
           <form
             action={awardeeUploadDocument}
-            encType="multipart/form-data"
             className="px-4 pb-4 pt-2 space-y-3"
           >
             <input type="hidden" name="grant_id" value={grant.id} />
@@ -131,6 +157,33 @@ export default async function PortalDocumentsPage() {
                 />
               </div>
             </div>
+            {/* Compliance fields */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Document Type <span className="text-gray-400">(for compliance tracking)</span>
+                </label>
+                <select
+                  name="document_type"
+                  className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#6b1a2a]"
+                >
+                  <option value="">— not a compliance doc —</option>
+                  {Object.entries(DOC_TYPE_LABELS).map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Expiry Date <span className="text-gray-400">(if applicable)</span>
+                </label>
+                <input
+                  type="date"
+                  name="expires_at"
+                  className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#6b1a2a]"
+                />
+              </div>
+            </div>
             <button
               type="submit"
               className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
@@ -153,14 +206,20 @@ export default async function PortalDocumentsPage() {
                 {doc.description && (
                   <p className="text-xs text-gray-500 mt-0.5">{doc.description}</p>
                 )}
-                <div className="flex flex-wrap gap-x-3 mt-0.5 text-xs text-gray-400">
+                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-0.5 text-xs text-gray-400">
                   <span>{formatBytes(doc.size_bytes)}</span>
                   {doc.profiles && (
                     <span>by {doc.profiles.full_name ?? doc.profiles.email}</span>
                   )}
                   <span>{new Date(doc.created_at).toLocaleDateString()}</span>
                   {doc.milestone_id && <span className="text-blue-500">📌 milestone</span>}
+                  {doc.is_compliance && doc.document_type && (
+                    <span className="font-medium text-[#6b1a2a]">{DOC_TYPE_LABELS[doc.document_type] ?? doc.document_type}</span>
+                  )}
                 </div>
+                {doc.is_compliance && (
+                  <div className="mt-1.5">{expiryBadge(doc.expires_at)}</div>
+                )}
               </div>
             </div>
           ))}

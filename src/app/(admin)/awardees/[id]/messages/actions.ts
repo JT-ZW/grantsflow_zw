@@ -33,7 +33,7 @@ export async function sendMessage(formData: FormData): Promise<void> {
   revalidatePath(`/awardees/${awardee_id}/messages`);
 }
 
-export async function markMessagesReadByAdmin(grantId: string, awardeeId: string): Promise<void> {
+export async function markMessagesReadByAdmin(grantId: string): Promise<void> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
@@ -43,6 +43,4 @@ export async function markMessagesReadByAdmin(grantId: string, awardeeId: string
     .update({ read_by_admin_at: new Date().toISOString() })
     .eq("grant_id", grantId)
     .is("read_by_admin_at", null);
-
-  revalidatePath(`/awardees/${awardeeId}/messages`);
 }

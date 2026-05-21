@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
-import PrintButton from "./PrintButton";
 
 const MILESTONE_STATUS_LABELS: Record<string, string> = {
   not_started: "Not Started",
@@ -56,6 +55,7 @@ export default async function AwardeeReportPage({ params }: PageProps) {
     currency_code: string;
     start_date: string | null;
     end_date: string | null;
+    category_id: string | null;
     milestones: {
       id: string;
       title: string;
@@ -69,6 +69,17 @@ export default async function AwardeeReportPage({ params }: PageProps) {
   const milestones = grant?.milestones?.sort((a, b) => a.sort_order - b.sort_order) ?? [];
   const completedCount = milestones.filter((m) => m.status === "completed").length;
   const progressPct = milestones.length > 0 ? Math.round((completedCount / milestones.length) * 100) : 0;
+
+  // Fetch category name if grant belongs to a category
+  let categoryName: string | null = null;
+  if (grant?.category_id) {
+    const { data: cat } = await supabase
+      .from("programme_categories")
+      .select("name")
+      .eq("id", grant.category_id)
+      .single();
+    categoryName = cat?.name ?? null;
+  }
 
   const [budgetsRes, disbursementsRes, expensesRes] = await Promise.all([
     supabase.from("budgets").select("*").eq("grant_id", grant?.id ?? "").order("created_at"),
@@ -90,21 +101,19 @@ export default async function AwardeeReportPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Print button — hidden when printing */}
-      <div className="print:hidden fixed top-4 right-4 z-10 flex gap-2">
-        <PrintButton />
+      {/* Action bar — hidden when printing */}
+      <div className="print:hidden flex items-center justify-end gap-2 px-8 py-4 border-b border-gray-100 bg-white">
+        <a
+          href={`/awardees/${id}`}
+          className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 shadow-sm hover:bg-gray-50 transition-colors"
+        >
+          ← Back
+        </a>
         <a
           href={`/api/reports/${id}/pdf`}
-          target="_blank"
           className="rounded-lg bg-[#6b1a2a] px-4 py-2 text-sm font-semibold text-white shadow hover:bg-[#5a1522] transition-colors"
         >
           ↓ Download PDF
-        </a>
-        <a
-          href={`/awardees/${id}`}
-          className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 shadow hover:bg-gray-50 transition-colors"
-        >
-          ← Back
         </a>
       </div>
 
@@ -151,6 +160,12 @@ export default async function AwardeeReportPage({ params }: PageProps) {
                 <span className="text-gray-400">Amount: </span>
                 <span className="font-medium">{grant ? fmt(Number(grant.amount_awarded), currency) : "—"}</span>
               </p>
+              {categoryName && (
+                <p className="text-sm text-gray-600">
+                  <span className="text-gray-400">Category: </span>
+                  <span className="font-medium">{categoryName}</span>
+                </p>
+              )}
               <p className="text-sm text-gray-600">
                 <span className="text-gray-400">Start: </span>{fmtDate(grant?.start_date ?? null)}
               </p>
@@ -176,7 +191,8 @@ export default async function AwardeeReportPage({ params }: PageProps) {
           {milestones.length === 0 ? (
             <p className="text-sm text-gray-400">No milestones added.</p>
           ) : (
-            <table className="w-full text-sm border-collapse">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse min-w-[400px]">
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="py-2 text-left text-xs font-semibold text-gray-500">#</th>
@@ -198,13 +214,14 @@ export default async function AwardeeReportPage({ params }: PageProps) {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 
         {/* Financial Summary */}
         <div className="mb-8">
           <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Financial Summary</h2>
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             {[
               { label: "Amount Awarded", value: fmt(Number(grant?.amount_awarded ?? 0), currency) },
               { label: "Budget Approved", value: fmt(totalBudgeted, currency) },
@@ -223,7 +240,8 @@ export default async function AwardeeReportPage({ params }: PageProps) {
         {budgets.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Budget Allocation</h2>
-            <table className="w-full text-sm border-collapse">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse min-w-[400px]">
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="py-2 text-left text-xs font-semibold text-gray-500">Category</th>
@@ -245,6 +263,7 @@ export default async function AwardeeReportPage({ params }: PageProps) {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 
@@ -252,7 +271,8 @@ export default async function AwardeeReportPage({ params }: PageProps) {
         {disbursements.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Disbursements</h2>
-            <table className="w-full text-sm border-collapse">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse min-w-[400px]">
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="py-2 text-left text-xs font-semibold text-gray-500">Date</th>
@@ -276,6 +296,7 @@ export default async function AwardeeReportPage({ params }: PageProps) {
                 </tr>
               </tbody>
             </table>
+            </div>
           </div>
         )}
 
@@ -283,7 +304,8 @@ export default async function AwardeeReportPage({ params }: PageProps) {
         {expenses.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Expense Reports</h2>
-            <table className="w-full text-sm border-collapse">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse min-w-[500px]">
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="py-2 text-left text-xs font-semibold text-gray-500">Date</th>
@@ -307,10 +329,9 @@ export default async function AwardeeReportPage({ params }: PageProps) {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
-
-        {/* Footer */}
         <div className="border-t border-gray-200 pt-6 mt-10 text-xs text-gray-400 flex justify-between print:fixed print:bottom-0 print:left-0 print:right-0 print:px-8 print:pb-4 print:bg-white">
           <p>GrantsFlow — Funding. Transparency. Impact.</p>
           <p>Confidential — {generatedAt}</p>

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import {
   Document,
+  Image,
   Page,
   Text,
   View,
@@ -12,6 +13,11 @@ import {
   Font,
 } from "@react-pdf/renderer";
 import React from "react";
+import path from "path";
+import fs from "fs";
+
+const logoPath = path.join(process.cwd(), "public", "logo.png");
+const logoDataUri = `data:image/png;base64,${fs.readFileSync(logoPath).toString("base64")}`;
 
 const styles = StyleSheet.create({
   page: { padding: 48, fontSize: 10, fontFamily: "Helvetica", color: "#1a1a1a" },
@@ -55,13 +61,24 @@ export async function GET(
   // Fetch all data needed for the report
   const [awardeeRes, grantRes] = await Promise.all([
     supabase.from("awardees").select("id, full_name, email, awardee_type, faculty, department").eq("id", awardeeId).single(),
-    supabase.from("grants").select("id, title, status, amount_awarded, currency_code, start_date, end_date, approval_status").eq("awardee_id", awardeeId).single(),
+    supabase.from("grants").select("id, title, status, amount_awarded, currency_code, start_date, end_date, approval_status, category_id").eq("awardee_id", awardeeId).single(),
   ]);
 
   const awardee = awardeeRes.data as { id: string; full_name: string; email: string; awardee_type: string | null; faculty: string | null; department: string | null } | null;
-  const grant = grantRes.data as { id: string; title: string; status: string; amount_awarded: number; currency_code: string; start_date: string | null; end_date: string | null; approval_status: string | null } | null;
+  const grant = grantRes.data as { id: string; title: string; status: string; amount_awarded: number; currency_code: string; start_date: string | null; end_date: string | null; approval_status: string | null; category_id: string | null } | null;
 
   if (!awardee || !grant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Fetch category name if applicable
+  let categoryName: string | null = null;
+  if (grant.category_id) {
+    const { data: cat } = await supabase
+      .from("programme_categories")
+      .select("name")
+      .eq("id", grant.category_id)
+      .single();
+    categoryName = cat?.name ?? null;
+  }
 
   const [milestonesRes, expensesRes, disbursementsRes] = await Promise.all([
     supabase.from("milestones").select("id, title, due_date, status").eq("grant_id", grant.id).order("due_date"),
@@ -81,8 +98,13 @@ export async function GET(
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Grant Report</Text>
-          <Text style={styles.subtitle}>Generated {fmtDate(new Date().toISOString())}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Image src={logoDataUri} style={{ width: 100, height: 28, objectFit: "contain" }} />
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={styles.title}>Grant Report</Text>
+              <Text style={styles.subtitle}>Generated {fmtDate(new Date().toISOString())}</Text>
+            </View>
+          </View>
         </View>
 
         {/* Awardee Info */}
@@ -101,6 +123,9 @@ export async function GET(
           <View style={styles.row}><Text style={styles.label}>Title</Text><Text style={styles.value}>{grant.title}</Text></View>
           <View style={styles.row}><Text style={styles.label}>Status</Text><Text style={styles.value}>{grant.status}</Text></View>
           <View style={styles.row}><Text style={styles.label}>Approval Status</Text><Text style={styles.value}>{grant.approval_status ?? "—"}</Text></View>
+          {categoryName && (
+            <View style={styles.row}><Text style={styles.label}>Category</Text><Text style={styles.value}>{categoryName}</Text></View>
+          )}
           <View style={styles.row}><Text style={styles.label}>Amount Awarded</Text><Text style={styles.value}>{fmt(grant.amount_awarded, grant.currency_code)}</Text></View>
           <View style={styles.row}><Text style={styles.label}>Start Date</Text><Text style={styles.value}>{fmtDate(grant.start_date)}</Text></View>
           <View style={styles.row}><Text style={styles.label}>End Date</Text><Text style={styles.value}>{fmtDate(grant.end_date)}</Text></View>

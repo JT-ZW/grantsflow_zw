@@ -15,7 +15,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <img
             src="/logo.png"
             alt="GrantsFlow"
-            className="mx-auto h-16 w-auto mb-4"
+            className="mx-auto h-28 w-auto mb-4"
           />
           <p className="mt-2 text-xs font-semibold tracking-widest text-gray-400 uppercase">
             Funding. Transparency. Impact.
@@ -32,8 +32,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </div>
           )}
 
-          <form action={login} className="space-y-5">
-            <div>
+          <form action={login} className="space-y-5" suppressHydrationWarning>
+            <div suppressHydrationWarning>
               <label
                 htmlFor="email"
                 className="block text-sm font-medium text-gray-700 mb-1"
@@ -47,11 +47,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 autoComplete="email"
                 required
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="you@university.ac.za"
+                placeholder="you@africau.edu"
+                suppressHydrationWarning
               />
             </div>
 
-            <div>
+            <div suppressHydrationWarning>
               <label
                 htmlFor="password"
                 className="block text-sm font-medium text-gray-700 mb-1"
@@ -66,6 +67,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 required
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="••••••••"
+                suppressHydrationWarning
               />
             </div>
 

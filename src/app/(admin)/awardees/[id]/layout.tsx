@@ -25,12 +25,12 @@ export default async function AwardeeDetailLayout({
 
   return (
     <div>
-      <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+      <div className="flex items-center gap-2 text-sm text-gray-500 mb-4 flex-wrap">
         <Link href="/awardees" className="hover:text-gray-700">
           Awardees
         </Link>
         <span>/</span>
-        <span className="text-gray-900 font-medium">{awardee.full_name}</span>
+        <span className="text-gray-900 font-medium truncate max-w-[200px] sm:max-w-none">{awardee.full_name}</span>
       </div>
       <AwardeeTabs id={id} />
       {children}

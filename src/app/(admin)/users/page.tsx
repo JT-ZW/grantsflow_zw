@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { ChangePasswordButton } from "./ChangePasswordButton";
 import { DeleteUserButton } from "./DeleteUserButton";
-import { InviteUserForm } from "./InviteUserForm";
+import { UserFormPanel } from "./UserFormPanel";
 import { changeUserRole, toggleUserActive } from "./actions";
 
 type Profile = {
@@ -50,8 +51,8 @@ export default async function UsersPage() {
         </p>
       </div>
 
-      {/* Invite form */}
-      <InviteUserForm />
+      {/* Add user — invite or create directly */}
+      <UserFormPanel />
 
       {/* Active users */}
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
@@ -87,7 +88,7 @@ export default async function UsersPage() {
 
 function UserRow({ profile, isSelf }: { profile: Profile; isSelf: boolean }) {
   return (
-    <div className="flex items-center gap-4 px-6 py-4">
+    <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:gap-4 sm:px-6">
       {/* Avatar initials */}
       <div className="h-9 w-9 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
         <span className="text-sm font-semibold text-gray-600">
@@ -113,7 +114,7 @@ function UserRow({ profile, isSelf }: { profile: Profile; isSelf: boolean }) {
       </div>
 
       {/* Controls */}
-      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+      <div className="flex items-center gap-2 flex-wrap">
         {/* Current role badge */}
         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${ROLE_STYLES[profile.role] ?? "bg-gray-100 text-gray-600"}`}>
           {ROLE_OPTIONS.find((r) => r.value === profile.role)?.label ?? profile.role}
@@ -153,6 +154,12 @@ function UserRow({ profile, isSelf }: { profile: Profile; isSelf: boolean }) {
                 {profile.is_active ? "Deactivate" : "Reactivate"}
               </button>
             </form>
+
+            {/* Change password */}
+            <ChangePasswordButton
+              profileId={profile.id}
+              displayName={profile.full_name ?? profile.email}
+            />
 
             {/* Delete permanently */}
             <DeleteUserButton

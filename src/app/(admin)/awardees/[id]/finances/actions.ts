@@ -258,3 +258,151 @@ export async function reviewExpense(formData: FormData) {
 
   revalidatePath(`/awardees/${awardee_id}/finances`);
 }
+
+// ── Review budget amendment request ─────────────────────────────────────────
+
+const reviewAmendmentSchema = z.object({
+  amendment_id: z.string().uuid(),
+  awardee_id:   z.string().uuid(),
+  status:       z.enum(["approved", "rejected"]),
+  review_notes: z.string().max(2000).optional(),
+});
+
+export async function reviewBudgetAmendment(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { data: profile } = await supabase
+    .from("profiles").select("role").eq("id", user.id).single();
+  if (!profile || !["admin", "program_manager"].includes(profile.role)) return;
+
+  const parsed = reviewAmendmentSchema.safeParse({
+    amendment_id: formData.get("amendment_id"),
+    awardee_id:   formData.get("awardee_id"),
+    status:       formData.get("status"),
+    review_notes: formData.get("review_notes") || undefined,
+  });
+  if (!parsed.success) return;
+
+  const { amendment_id, awardee_id, status, review_notes } = parsed.data;
+
+  await supabase
+    .from("budget_amendments")
+    .update({
+      status,
+      review_notes: review_notes ?? null,
+      reviewed_by:  user.id,
+      reviewed_at:  new Date().toISOString(),
+    })
+    .eq("id", amendment_id);
+
+  await supabase.from("audit_logs").insert({
+    actor_id:    user.id,
+    action:      `budget_amendment.${status}`,
+    entity_type: "budget_amendment",
+    entity_id:   amendment_id,
+    new_data:    { status, review_notes },
+  });
+
+  // Notify the awardee
+  const { data: amendment } = await supabase
+    .from("budget_amendments")
+    .select("category, amount, currency_code, awardees(user_id)")
+    .eq("id", amendment_id)
+    .single();
+
+  const awardeeUserId = (amendment?.awardees as unknown as { user_id: string } | null)?.user_id;
+  if (awardeeUserId) {
+    await supabase.from("notifications").insert({
+      user_id: awardeeUserId,
+      title:   `Budget Amendment ${status === "approved" ? "Approved" : "Rejected"}`,
+      body:    `Your amendment request for "${amendment?.category}" (${amendment?.currency_code} ${Number(amendment?.amount).toFixed(2)}) was ${status}${review_notes ? `: ${review_notes}` : "."}`,
+      type:    "amendment_reviewed",
+      entity_type: "budget_amendment",
+      entity_id:   amendment_id,
+      href:    "/portal/amendments",
+    });
+  }
+
+  revalidatePath(`/awardees/${awardee_id}/finances`);
+}
+
+// ── Review disbursement request ──────────────────────────────────────────────
+
+const reviewDisbursementSchema = z.object({
+  request_id:   z.string().uuid(),
+  awardee_id:   z.string().uuid(),
+  status:       z.enum(["approved", "rejected", "processed"]),
+  review_notes: z.string().max(2000).optional(),
+});
+
+export async function reviewDisbursementRequest(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { data: profile } = await supabase
+    .from("profiles").select("role").eq("id", user.id).single();
+  if (!profile || !["admin", "program_manager"].includes(profile.role)) return;
+
+  const parsed = reviewDisbursementSchema.safeParse({
+    request_id:   formData.get("request_id"),
+    awardee_id:   formData.get("awardee_id"),
+    status:       formData.get("status"),
+    review_notes: formData.get("review_notes") || undefined,
+  });
+  if (!parsed.success) return;
+
+  const { request_id, awardee_id, status, review_notes } = parsed.data;
+
+  const updatePayload: Record<string, unknown> = {
+    status,
+    reviewed_by:  user.id,
+    reviewed_at:  new Date().toISOString(),
+    review_notes: review_notes ?? null,
+  };
+  if (status === "processed") {
+    updatePayload.processed_at = new Date().toISOString();
+  }
+
+  const { error } = await supabase
+    .from("disbursement_requests")
+    .update(updatePayload)
+    .eq("id", request_id);
+
+  if (error) return;
+
+  await supabase.from("audit_logs").insert({
+    actor_id:    user.id,
+    action:      `disbursement.${status}`,
+    entity_type: "disbursement_request",
+    entity_id:   request_id,
+    new_data:    { status, review_notes },
+  });
+
+  // Notify the awardee
+  const { data: req } = await supabase
+    .from("disbursement_requests")
+    .select("amount, currency_code, awardees(user_id)")
+    .eq("id", request_id)
+    .single();
+
+  const awardeeUserId = (req?.awardees as unknown as { user_id: string } | null)?.user_id;
+  if (awardeeUserId) {
+    const statusLabel = status === "approved" ? "Approved" : status === "rejected" ? "Rejected" : "Processed";
+    await supabase.from("notifications").insert({
+      user_id:     awardeeUserId,
+      title:       `Disbursement Request ${statusLabel}`,
+      body:        `Your request for ${req?.currency_code} ${Number(req?.amount).toFixed(2)} was ${status}${review_notes ? `: ${review_notes}` : "."}`,
+      type:        "disbursement_reviewed",
+      entity_type: "disbursement_request",
+      entity_id:   request_id,
+      href:        "/portal/disbursements",
+    });
+  }
+
+  revalidatePath(`/awardees/${awardee_id}/finances`);
+}

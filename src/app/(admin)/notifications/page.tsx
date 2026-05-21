@@ -3,12 +3,18 @@ import Link from "next/link";
 import { markAllRead, markNotificationRead } from "./actions";
 
 const TYPE_ICONS: Record<string, string> = {
-  milestone_due:          "⏰",
-  milestone_overdue:      "🚨",
-  expense_submitted:      "🧾",
-  expense_reviewed:       "✅",
-  disbursement_received:  "💸",
-  grant_status_changed:   "📋",
+  milestone_due:                 "⏰",
+  milestone_overdue:             "🚨",
+  milestone_status_changed:      "🎯",
+  milestone_progress:            "📊",
+  expense_submitted:             "🧾",
+  expense_reviewed:              "✅",
+  disbursement_received:         "💸",
+  disbursement_request_received: "💰",
+  grant_status_changed:          "📋",
+  document_expiring:             "📄",
+  amendment_submitted:           "📝",
+  report_submitted:              "📑",
 };
 
 function fmtDatetime(d: string) {
