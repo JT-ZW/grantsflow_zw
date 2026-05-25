@@ -27,12 +27,10 @@ export default async function ImpactPage() {
 
   const allGrants = grants ?? [];
   const activeGrants = allGrants.filter((g) => g.status === "active");
-  // Use all non-cancelled grants for impact aggregation (completed grants still had impact)
-  const impactGrants = allGrants;
 
   // Aggregate sectors
   const sectorCounts: Record<string, number> = {};
-  for (const g of impactGrants) {
+  for (const g of activeGrants) {
     for (const s of (g.sectors as string[] | null) ?? []) {
       sectorCounts[s] = (sectorCounts[s] ?? 0) + 1;
     }
@@ -40,7 +38,7 @@ export default async function ImpactPage() {
 
   // Aggregate SDGs
   const sdgCounts: Record<number, number> = {};
-  for (const g of impactGrants) {
+  for (const g of activeGrants) {
     for (const n of (g.sdg_goals as number[] | null) ?? []) {
       sdgCounts[n] = (sdgCounts[n] ?? 0) + 1;
     }
@@ -48,7 +46,7 @@ export default async function ImpactPage() {
 
   // Aggregate country distribution for map
   const grantsByCountry: Record<string, number> = {};
-  for (const g of impactGrants) {
+  for (const g of activeGrants) {
     for (const code of (g.country_codes as string[] | null) ?? []) {
       grantsByCountry[code] = (grantsByCountry[code] ?? 0) + 1;
     }
@@ -89,10 +87,10 @@ export default async function ImpactPage() {
       {/* Stat row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "Active Grants",    value: activeGrants.length },
+          { label: "Active Grants", value: activeGrants.length },
           { label: "Countries Reached", value: activeCountryCodes.length },
-          { label: "Sectors Covered",   value: Object.keys(sectorCounts).length },
-          { label: "SDGs Addressed",    value: Object.keys(sdgCounts).length },
+          { label: "Sectors Covered", value: Object.keys(sectorCounts).length },
+          { label: "SDGs Addressed", value: Object.keys(sdgCounts).length },
         ].map((s) => (
           <div key={s.label} className="rounded-xl border border-gray-200 bg-white p-5">
             <p className="text-xs text-gray-400">{s.label}</p>
@@ -122,10 +120,10 @@ export default async function ImpactPage() {
                 <div
                   key={n}
                   title={SDG_LABELS[n]}
-                  className={`flex flex-col items-center justify-center rounded-lg p-2 text-center transition-opacity ${active ? "opacity-100" : "opacity-25"}`}
-                  style={{ backgroundColor: active ? SDG_COLORS[n] : "#e5e7eb" }}
+                  className={`flex flex-col items-center justify-center rounded-lg p-2 text-center`}
+                  style={{ backgroundColor: active ? SDG_COLORS[n] : "#d1d5db" }}
                 >
-                  <span className="text-lg font-black text-white leading-none">{n}</span>
+                  <span className={`text-lg font-black leading-none ${active ? "text-white" : "text-gray-400"}`}>{n}</span>
                   {active && (
                     <span className="text-[9px] text-white/80 mt-0.5">{count} grant{count !== 1 ? "s" : ""}</span>
                   )}

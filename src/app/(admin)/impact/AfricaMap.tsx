@@ -3,8 +3,8 @@
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { useState } from "react";
 
-// World topojson from jsDelivr CDN (African countries filtered below)
-const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+// World topojson served from /public to avoid CSP restrictions
+const GEO_URL = "/world-110m.json";
 
 // ISO numeric → ISO alpha-3 mapping for African countries
 const NUMERIC_TO_ALPHA3: Record<string, string> = {
