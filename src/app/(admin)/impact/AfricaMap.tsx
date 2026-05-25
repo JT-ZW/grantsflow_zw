@@ -1,7 +1,7 @@
 "use client";
 
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 // World topojson served from /public to avoid CSP restrictions
 const GEO_URL = "/world-110m.json";
@@ -48,6 +48,8 @@ type Props = {
 
 export function AfricaMap({ grantsByCountry }: Props) {
   const [tooltip, setTooltip] = useState<string | null>(null);
+  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const maxGrants = Math.max(1, ...Object.values(grantsByCountry));
 
   function getFill(alpha3: string) {
@@ -62,9 +64,24 @@ export function AfricaMap({ grantsByCountry }: Props) {
   }
 
   return (
-    <div className="relative w-full">
-      {tooltip && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 rounded-lg bg-gray-900 text-white text-xs px-3 py-1.5 pointer-events-none shadow-lg">
+    <div
+      ref={containerRef}
+      className="relative w-full"
+      onMouseMove={(e) => {
+        if (!containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      }}
+    >
+      {tooltip && mousePos && (
+        <div
+          className="absolute z-10 rounded-lg bg-gray-900 text-white text-xs px-3 py-1.5 pointer-events-none shadow-lg whitespace-nowrap"
+          style={{
+            left: mousePos.x + 12,
+            top: mousePos.y - 32,
+            transform: mousePos.x > 400 ? "translateX(-110%)" : undefined,
+          }}
+        >
           {tooltip}
         </div>
       )}
@@ -103,7 +120,7 @@ export function AfricaMap({ grantsByCountry }: Props) {
                             : name
                         )
                       }
-                      onMouseLeave={() => setTooltip(null)}
+                      onMouseLeave={() => { setTooltip(null); setMousePos(null); }}
                       style={{
                         default: { outline: "none", cursor: count > 0 ? "pointer" : "default" },
                         hover:   { outline: "none", fill: count > 0 ? "#2a4010" : "#d4dfd0" },
