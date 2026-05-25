@@ -113,6 +113,101 @@ export async function addProgrammeCategory(
   return { success: `Category "${name}" added.` };
 }
 
+// ── Programme update / delete ─────────────────────────────────────────────────
+
+export type UpdateProgrammeState = { error?: string; success?: string } | null;
+
+export async function updateProgramme(
+  programmeId: string,
+  _prev: UpdateProgrammeState,
+  formData: FormData,
+): Promise<UpdateProgrammeState> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+  if (profile?.role !== "admin") return { error: "Only admins can edit programmes." };
+
+  const parsed = programmeSchema.safeParse({
+    name: formData.get("name"),
+    description: formData.get("description") || undefined,
+    total_budget: formData.get("total_budget") || undefined,
+    currency_code: formData.get("currency_code"),
+    start_date: formData.get("start_date") || undefined,
+    end_date: formData.get("end_date") || undefined,
+  });
+  if (!parsed.success) return { error: "Invalid input — check all fields." };
+
+  const d = parsed.data;
+
+  const { error } = await supabase
+    .from("programmes")
+    .update({
+      name: d.name,
+      description: d.description || null,
+      total_budget: d.total_budget || null,
+      currency_code: d.currency_code,
+      start_date: d.start_date || null,
+      end_date: d.end_date || null,
+    })
+    .eq("id", programmeId);
+
+  if (error) return { error: error.message };
+
+  await supabase.from("audit_logs").insert({
+    actor_id: user.id,
+    action: "programme.updated",
+    entity_type: "programme",
+    entity_id: programmeId,
+    new_data: { name: d.name },
+  });
+
+  revalidatePath("/programmes");
+  return { success: `Programme "${d.name}" updated.` };
+}
+
+export async function deleteProgramme(programmeId: string): Promise<{ error?: string; success?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+  if (profile?.role !== "admin") return { error: "Only admins can delete programmes." };
+
+  // Block deletion if the programme has grants
+  const { data: grants } = await supabase
+    .from("grants")
+    .select("id")
+    .eq("programme_id", programmeId)
+    .limit(1);
+  if (grants && grants.length > 0) {
+    return { error: "Cannot delete a programme that has grants assigned. Remove all grants first." };
+  }
+
+  const { data: prog } = await supabase
+    .from("programmes")
+    .select("name")
+    .eq("id", programmeId)
+    .single();
+
+  const { error } = await supabase.from("programmes").delete().eq("id", programmeId);
+  if (error) return { error: error.message };
+
+  await supabase.from("audit_logs").insert({
+    actor_id: user.id,
+    action: "programme.deleted",
+    entity_type: "programme",
+    entity_id: programmeId,
+    new_data: { name: prog?.name },
+  });
+
+  revalidatePath("/programmes");
+  return { success: "Programme deleted." };
+}
+
+// ── Category management ──────────────────────────────────────────────────────
+
 export async function deleteProgrammeCategory(categoryId: string, programmeId: string): Promise<{ error?: string }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

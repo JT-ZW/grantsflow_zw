@@ -46,6 +46,4 @@ export async function markReadByAwardee(grantId: string): Promise<void> {
     .update({ read_by_awardee_at: new Date().toISOString() })
     .eq("grant_id", grantId)
     .is("read_by_awardee_at", null);
-
-  revalidatePath("/portal/messages");
 }

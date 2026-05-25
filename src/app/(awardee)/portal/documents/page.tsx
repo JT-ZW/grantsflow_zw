@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { awardeeUploadDocument } from "./actions";
 
@@ -73,10 +74,10 @@ export default async function PortalDocumentsPage() {
 
   const awardeeData = awardee as unknown as {
     id: string;
-    grants: { id: string; title: string } | null;
+    grants: { id: string; title: string }[];
   } | null;
 
-  const grant = awardeeData?.grants ?? null;
+  const grant = awardeeData?.grants?.[0] ?? null;
 
   const { data: milestones } = grant
     ? await supabase
@@ -236,9 +237,9 @@ async function DownloadLink({
   storagePath: string;
   name: string;
 }) {
-  const supabase = await createClient();
-  const { data } = await supabase.storage
-    .from("grant-documents")
+  const adminClient = createAdminClient();
+  const { data } = await adminClient.storage
+    .from("grants-documents")
     .createSignedUrl(storagePath, 60 * 60);
 
   if (!data?.signedUrl) {

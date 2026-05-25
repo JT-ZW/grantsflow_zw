@@ -298,3 +298,154 @@ export async function deleteUser(formData: FormData): Promise<void> {
 
   revalidatePath("/users");
 }
+
+// ── Awardee portal access management ─────────────────────────────────────────
+
+export type AwardeePortalState = { error?: string; success?: string } | null;
+
+/**
+ * Send (or resend) a Supabase magic-link invite to an awardee so they can
+ * self-register on the portal.
+ */
+export async function sendAwardeePortalInvite(
+  _prev: AwardeePortalState,
+  formData: FormData,
+): Promise<AwardeePortalState> {
+  const actor = await requireAdmin();
+  if (!actor) return { error: "Unauthorized" };
+
+  const awardeeId = (formData.get("awardee_id") as string)?.trim();
+  if (!awardeeId) return { error: "Missing awardee ID." };
+
+  const supabase = await createClient();
+  const { data: awardee } = await supabase
+    .from("awardees")
+    .select("id, email, full_name, user_id")
+    .eq("id", awardeeId)
+    .single();
+
+  if (!awardee) return { error: "Awardee not found." };
+  if (awardee.user_id) return { error: "This awardee already has a portal account." };
+
+  const admin = createAdminClient();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const { error } = await admin.auth.admin.inviteUserByEmail(awardee.email, {
+    data: { full_name: awardee.full_name },
+    redirectTo: `${siteUrl}/auth/callback`,
+  });
+
+  // "User already registered" just means we're resending — treat as success
+  if (error && !error.message.toLowerCase().includes("already registered")) {
+    return { error: error.message };
+  }
+
+  // Ensure the profile has the correct role
+  await admin
+    .from("profiles")
+    .update({ role: "awardee", full_name: awardee.full_name })
+    .eq("email", awardee.email);
+
+  await supabase.from("audit_logs").insert({
+    actor_id: actor.id,
+    action: "awardee.portal_invite_sent",
+    entity_type: "awardee",
+    entity_id: awardeeId,
+    new_data: { email: awardee.email },
+  });
+
+  revalidatePath("/users");
+  return { success: `Portal invitation sent to ${awardee.email}.` };
+}
+
+/**
+ * Admin creates a portal account on behalf of an awardee (sets a password for
+ * them). Works whether the awardee was previously invited or never invited.
+ */
+const createPortalAccountSchema = z.object({
+  awardee_id: z.string().uuid(),
+  password: z.string().min(8).max(128),
+});
+
+export async function createAwardeePortalAccount(
+  _prev: AwardeePortalState,
+  formData: FormData,
+): Promise<AwardeePortalState> {
+  const actor = await requireAdmin();
+  if (!actor) return { error: "Unauthorized" };
+
+  const parsed = createPortalAccountSchema.safeParse({
+    awardee_id: formData.get("awardee_id"),
+    password: formData.get("password"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+
+  const { awardee_id, password } = parsed.data;
+  const admin = createAdminClient();
+  const supabase = await createClient();
+
+  const { data: awardee } = await supabase
+    .from("awardees")
+    .select("id, email, full_name, user_id")
+    .eq("id", awardee_id)
+    .single();
+
+  if (!awardee) return { error: "Awardee not found." };
+  if (awardee.user_id) return { error: "This awardee already has a portal account. Use Change Password instead." };
+
+  // Check if an auth user already exists for this email (previous invite)
+  const { data: existingProfile } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("email", awardee.email)
+    .maybeSingle();
+
+  let userId: string;
+
+  if (existingProfile) {
+    // Update the existing user's password and confirm their email
+    userId = existingProfile.id;
+    const { error } = await admin.auth.admin.updateUserById(userId, {
+      password,
+      email_confirm: true,
+    });
+    if (error) return { error: error.message };
+  } else {
+    // Create a brand-new confirmed auth user
+    const { data: created, error } = await admin.auth.admin.createUser({
+      email: awardee.email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: awardee.full_name },
+    });
+    if (error) return { error: error.message };
+    userId = created.user.id;
+  }
+
+  // Ensure correct role on the profile
+  await admin
+    .from("profiles")
+    .update({ role: "awardee", full_name: awardee.full_name })
+    .eq("id", userId);
+
+  // Link the awardee record
+  await admin.from("awardees").update({ user_id: userId }).eq("id", awardee_id);
+
+  // Ensure awardee_members entry exists (required for portal RLS)
+  await admin.from("awardee_members").upsert(
+    { awardee_id, profile_id: userId, is_primary: true },
+    { onConflict: "awardee_id,profile_id" },
+  );
+
+  await supabase.from("audit_logs").insert({
+    actor_id: actor.id,
+    action: "awardee.portal_account_created",
+    entity_type: "awardee",
+    entity_id: awardee_id,
+    new_data: { email: awardee.email },
+  });
+
+  revalidatePath("/users");
+  return {
+    success: `Portal account created for ${awardee.full_name}. They can now sign in with the password you set.`,
+  };
+}

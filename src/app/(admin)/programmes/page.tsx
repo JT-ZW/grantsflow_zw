@@ -1,6 +1,7 @@
 ﻿import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { CreateProgrammeForm } from "./CreateProgrammeForm";
+import { ProgrammeActions } from "./ProgrammeActions";
 
 type Programme = {
   id: string;
@@ -369,6 +370,18 @@ export default async function ProgrammesPage() {
                         {categoryCount} {categoryCount === 1 ? "category" : "categories"}
                       </span>
                     </Link>
+                    <ProgrammeActions
+                      programme={{
+                        id: p.id,
+                        name: p.name,
+                        description: p.description,
+                        total_budget: p.total_budget,
+                        currency_code: p.currency_code,
+                        start_date: p.start_date,
+                        end_date: p.end_date,
+                        categoryCount,
+                      }}
+                    />
                   </div>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -64,8 +65,9 @@ export async function uploadDocument(formData: FormData) {
   // Unique storage path to avoid collisions
   const storagePath = `grants/${grant_id}/${crypto.randomUUID()}.${safeExt}`;
 
-  const { error: uploadError } = await supabase.storage
-    .from("grant-documents")
+  const adminStorage = createAdminClient();
+  const { error: uploadError } = await adminStorage.storage
+    .from("grants-documents")
     .upload(storagePath, file, {
       contentType: file.type,
       upsert: false,
@@ -106,7 +108,7 @@ export async function uploadDocument(formData: FormData) {
 
   if (dbError) {
     // Roll back the storage upload if DB insert fails
-    await supabase.storage.from("grant-documents").remove([storagePath]);
+    await adminStorage.storage.from("grants-documents").remove([storagePath]);
     return { error: dbError.message };
   }
 
@@ -210,7 +212,8 @@ export async function deleteDocument(formData: FormData) {
 
   if (!doc) return { error: "Document not found" };
 
-  await supabase.storage.from("grant-documents").remove([doc.storage_path]);
+  const adminStorage = createAdminClient();
+  await adminStorage.storage.from("grants-documents").remove([doc.storage_path]);
 
   await supabase.from("documents").delete().eq("id", document_id);
 

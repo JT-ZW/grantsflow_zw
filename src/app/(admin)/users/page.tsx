@@ -3,6 +3,7 @@ import { ChangePasswordButton } from "./ChangePasswordButton";
 import { DeleteUserButton } from "./DeleteUserButton";
 import { UserFormPanel } from "./UserFormPanel";
 import { changeUserRole, toggleUserActive } from "./actions";
+import { AwardeePortalRow, type AwardeePortalItem, type AwardeePortalStatus } from "./AwardeePortalRow";
 
 type Profile = {
   id: string;
@@ -41,6 +42,41 @@ export default async function UsersPage() {
   const profiles = (data ?? []) as Profile[];
   const active = profiles.filter((p) => p.is_active);
   const inactive = profiles.filter((p) => !p.is_active);
+
+  // Awardee portal access data
+  const { data: awardeesRaw } = await supabase
+    .from("awardees")
+    .select("id, full_name, email, user_id")
+    .order("full_name");
+
+  const awardeeRows = awardeesRaw ?? [];
+  const awardeeEmails = awardeeRows.map((a) => a.email).filter(Boolean) as string[];
+
+  // Find which awardee emails already have a profile (means an invite was sent)
+  const { data: matchedProfiles } = awardeeEmails.length
+    ? await supabase
+        .from("profiles")
+        .select("id, email")
+        .in("email", awardeeEmails)
+    : { data: [] };
+
+  const profileEmailSet = new Set((matchedProfiles ?? []).map((p) => p.email));
+
+  const awardeePortalItems: AwardeePortalItem[] = awardeeRows.map((a) => {
+    let status: AwardeePortalStatus;
+    if (a.user_id) {
+      status = "registered";
+    } else if (profileEmailSet.has(a.email)) {
+      status = "invited_pending";
+    } else {
+      status = "not_invited";
+    }
+    return { id: a.id, full_name: a.full_name ?? a.email, email: a.email, status, user_id: a.user_id };
+  });
+
+  const notInvitedCount = awardeePortalItems.filter((a) => a.status === "not_invited").length;
+  const pendingCount = awardeePortalItems.filter((a) => a.status === "invited_pending").length;
+  const registeredCount = awardeePortalItems.filter((a) => a.status === "registered").length;
 
   return (
     <div className="space-y-6">
@@ -82,6 +118,36 @@ export default async function UsersPage() {
           </div>
         </div>
       )}
+
+      {/* Awardee Portal Access */}
+      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900">Awardee Portal Access</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Manage portal accounts for all awardees ·{" "}
+              <span className="text-green-700">{registeredCount} registered</span>
+              {pendingCount > 0 && (
+                <> · <span className="text-amber-700">{pendingCount} invite pending</span></>
+              )}
+              {notInvitedCount > 0 && (
+                <> · <span className="text-gray-500">{notInvitedCount} not invited</span></>
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="divide-y divide-gray-100 px-6">
+          {awardeePortalItems.length === 0 && (
+            <p className="py-6 text-sm text-gray-400 italic text-center">
+              No awardees found. Add awardees in the Awardees section first.
+            </p>
+          )}
+          {awardeePortalItems.map((awardee) => (
+            <AwardeePortalRow key={awardee.id} awardee={awardee} />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -128,6 +194,7 @@ function UserRow({ profile, isSelf }: { profile: Profile; isSelf: boolean }) {
               <select
                 name="role"
                 defaultValue={profile.role}
+                aria-label="Change user role"
                 className="rounded-md border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {ROLE_OPTIONS.map((r) => (

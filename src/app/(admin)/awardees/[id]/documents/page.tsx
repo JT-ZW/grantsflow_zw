@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import { deleteDocument, uploadDocument, setDocumentExpiry } from "./actions";
 
@@ -94,10 +95,10 @@ export default async function DocumentsPage({
 
   const grantData = awardee as unknown as {
     id: string;
-    grants: { id: string; title: string } | null;
+    grants: { id: string; title: string }[];
   };
 
-  const grant = grantData.grants;
+  const grant = grantData.grants?.[0] ?? null;
 
   const { data: milestones } = await supabase
     .from("milestones")
@@ -155,6 +156,7 @@ export default async function DocumentsPage({
                 <select
                   name="milestone_id"
                   className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  suppressHydrationWarning
                 >
                   <option value="">None</option>
                   {(milestones ?? []).map((m) => (
@@ -174,6 +176,7 @@ export default async function DocumentsPage({
                   maxLength={500}
                   placeholder="Brief note about this file"
                   className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  suppressHydrationWarning
                 />
               </div>
             </div>
@@ -298,9 +301,9 @@ async function DownloadLink({
   storagePath: string;
   name: string;
 }) {
-  const supabase = await createClient();
-  const { data } = await supabase.storage
-    .from("grant-documents")
+  const adminClient = createAdminClient();
+  const { data } = await adminClient.storage
+    .from("grants-documents")
     .createSignedUrl(storagePath, 60 * 60); // 1 hour
 
   if (!data?.signedUrl) {

@@ -1,4 +1,5 @@
 import { setPassword } from "@/app/auth/actions";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 interface Props {
   searchParams: Promise<{ error?: string }>;
@@ -46,16 +47,13 @@ export default async function SetPasswordPage({ searchParams }: Props) {
               >
                 New password
               </label>
-              <input
+              <PasswordInput
                 id="password"
                 name="password"
-                type="password"
                 autoComplete="new-password"
                 required
                 minLength={8}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="At least 8 characters"
-                suppressHydrationWarning
               />
             </div>
 
@@ -66,16 +64,13 @@ export default async function SetPasswordPage({ searchParams }: Props) {
               >
                 Confirm password
               </label>
-              <input
+              <PasswordInput
                 id="confirm_password"
                 name="confirm_password"
-                type="password"
                 autoComplete="new-password"
                 required
                 minLength={8}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Re-enter your password"
-                suppressHydrationWarning
               />
             </div>
 

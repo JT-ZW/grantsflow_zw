@@ -57,14 +57,16 @@ export async function submitExpense(formData: FormData) {
 
   if (!grant) return;
 
-  // Handle receipt file upload to storage
+  // Handle receipt file upload to storage.
+  // Use the admin client so the upload works regardless of bucket RLS policies.
   let receiptStoragePath: string | null = null;
   const receiptFile = formData.get("receipt_file") as File | null;
   if (receiptFile && receiptFile.size > 0) {
     if (receiptFile.size > 10 * 1024 * 1024) return; // 10 MB limit
     const ext = receiptFile.name.split(".").pop();
     const storagePath = `receipts/${grant_id}/${crypto.randomUUID()}.${ext}`;
-    const { error: uploadError } = await supabase.storage
+    const adminClient = createAdminClient();
+    const { error: uploadError } = await adminClient.storage
       .from("expense-receipts")
       .upload(storagePath, receiptFile, { contentType: receiptFile.type, upsert: false });
     if (!uploadError) receiptStoragePath = storagePath;

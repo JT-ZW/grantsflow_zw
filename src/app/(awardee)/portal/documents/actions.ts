@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -77,8 +78,9 @@ export async function awardeeUploadDocument(formData: FormData): Promise<void> {
 
   const storagePath = `grants/${grant_id}/${crypto.randomUUID()}.${ext}`;
 
-  const { error: uploadError } = await supabase.storage
-    .from("grant-documents")
+  const adminStorage = createAdminClient();
+  const { error: uploadError } = await adminStorage.storage
+    .from("grants-documents")
     .upload(storagePath, file, { contentType: file.type, upsert: false });
 
   if (uploadError) return;
@@ -100,7 +102,7 @@ export async function awardeeUploadDocument(formData: FormData): Promise<void> {
   });
 
   if (dbError) {
-    await supabase.storage.from("grant-documents").remove([storagePath]);
+    await adminStorage.storage.from("grants-documents").remove([storagePath]);
     return;
   }
 

@@ -1,4 +1,5 @@
 ﻿import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { submitExpense } from "./actions";
 
@@ -128,12 +129,13 @@ export default async function AwardeeFinancesPortalPage() {
   const disbursements = (disbursementsRes.data ?? []) as Disbursement[];
   const expenses      = (expensesRes.data      ?? []) as Expense[];
 
+  const adminClient = createAdminClient();
   const receiptUrls: Record<string, string> = {};
   await Promise.all(
     expenses
       .filter((e) => e.receipt_storage_path)
       .map(async (e) => {
-        const { data } = await supabase.storage
+        const { data } = await adminClient.storage
           .from("expense-receipts")
           .createSignedUrl(e.receipt_storage_path!, 3600);
         if (data?.signedUrl) receiptUrls[e.id] = data.signedUrl;

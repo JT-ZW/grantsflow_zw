@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import {
   addBudgetLine,
@@ -111,14 +112,16 @@ export default async function AwardeeFinancesPage({ params }: PageProps) {
   const disbursementReqs = rawDisbReqs ?? [];
   const pendingDisbReqs = disbursementReqs.filter((r) => r.status === "pending");
 
-  // Generate signed receipt URLs for admin viewing (1h expiry)
+  // Generate signed receipt URLs for admin viewing (1h expiry).
+  // Use the admin client (service role) so storage RLS doesn't block cross-user access.
+  const adminClient = createAdminClient();
   const receiptUrls: Record<string, string> = {};
   await Promise.all(
     expenses
       .filter((e) => (e as unknown as { receipt_storage_path?: string }).receipt_storage_path)
       .map(async (e) => {
         const path = (e as unknown as { receipt_storage_path: string }).receipt_storage_path;
-        const { data } = await supabase.storage
+        const { data } = await adminClient.storage
           .from("expense-receipts")
           .createSignedUrl(path, 3600);
         if (data?.signedUrl) receiptUrls[e.id] = data.signedUrl;
