@@ -294,7 +294,7 @@ export default async function AnalyticsPage() {
       {/* KPI Strip */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
 
-        {/* Hero — Portfolio Deployed */}
+        {/* Hero â€” Portfolio Deployed */}
         <div
           className="col-span-2 sm:col-span-1 rounded-2xl p-5 flex flex-col justify-between"
           style={{ background: "linear-gradient(145deg,#6b1a2a 0%,#3d0f19 100%)", minHeight: "116px" }}
@@ -339,7 +339,7 @@ export default async function AnalyticsPage() {
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400">Report Compliance</p>
           <div>
             <p className="text-[2.2rem] font-black leading-none text-gray-900">
-              {complianceRate !== null ? `${complianceRate}%` : "—"}
+              {complianceRate !== null ? `${complianceRate}%` : "â€”"}
             </p>
             <p className="text-xs text-gray-400 mt-1">
               {dueReports.length > 0 ? `${submittedReports.length}/${dueReports.length} due` : "No reports due"}
@@ -352,7 +352,7 @@ export default async function AnalyticsPage() {
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400">Avg Days to Disburse</p>
           <div>
             <p className="text-[2.2rem] font-black leading-none text-gray-900">
-              {avgDaysToDisb !== null ? avgDaysToDisb : "—"}
+              {avgDaysToDisb !== null ? avgDaysToDisb : "â€”"}
             </p>
             <p className="text-xs text-gray-400 mt-1">days from grant start</p>
           </div>
@@ -367,7 +367,7 @@ export default async function AnalyticsPage() {
           <div className="flex items-start justify-between mb-6">
             <div>
               <h2 className="text-sm font-semibold text-gray-900">Disbursement Trend</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Last 6 months · {dominantCurrency}</p>
+              <p className="text-xs text-gray-400 mt-0.5">Last 6 months Â· {dominantCurrency}</p>
             </div>
             <div className="text-right">
               <p className="text-xl font-bold text-gray-900">{fmtMoney(totalDisbursed, dominantCurrency)}</p>
@@ -584,7 +584,7 @@ export default async function AnalyticsPage() {
             <div className="flex items-center justify-between mb-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-400">Expense Accountability</p>
               <span className="text-sm font-bold text-gray-900">
-                {totalDisbursed > 0 ? `${Math.round((totalExpensed / totalDisbursed) * 100)}%` : "—"}
+                {totalDisbursed > 0 ? `${Math.round((totalExpensed / totalDisbursed) * 100)}%` : "â€”"}
               </span>
             </div>
             <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
@@ -663,7 +663,7 @@ export default async function AnalyticsPage() {
                         <span className="text-sm font-bold whitespace-nowrap" style={{ color: barColor }}>{p.pct}%</span>
                       </div>
                       <p className="text-xs text-gray-400 mb-2">
-                        {p.awardee?.full_name ?? "—"} &middot; {p.comp}/{p.total} milestones
+                        {p.awardee?.full_name ?? "â€”"} &middot; {p.comp}/{p.total} milestones
                       </p>
                       <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
                         <div className="h-full rounded-full" style={{ width: `${p.pct}%`, backgroundColor: barColor }} />
@@ -700,7 +700,7 @@ export default async function AnalyticsPage() {
                   <p className="text-sm font-semibold text-blue-900">
                     {pendingDisbCount} Disbursement Request{pendingDisbCount !== 1 ? "s" : ""}
                   </p>
-                  <p className="text-xs text-blue-600 mt-0.5">Awaiting approval · Finances</p>
+                  <p className="text-xs text-blue-600 mt-0.5">Awaiting approval Â· Finances</p>
                 </div>
               </Link>
             )}
@@ -716,7 +716,7 @@ export default async function AnalyticsPage() {
                   <p className="text-sm font-semibold text-yellow-900">
                     {pendingExpCount} Pending Expense{pendingExpCount !== 1 ? "s" : ""}
                   </p>
-                  <p className="text-xs text-yellow-600 mt-0.5">Awaiting review · Finances</p>
+                  <p className="text-xs text-yellow-600 mt-0.5">Awaiting review Â· Finances</p>
                 </div>
               </Link>
             )}
@@ -748,7 +748,7 @@ export default async function AnalyticsPage() {
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-orange-900 truncate">{g.title}</p>
                     <p className="text-xs text-orange-600 mt-0.5">
-                      {awardeeData?.full_name ?? "—"} &middot; {days}d left &middot;{" "}
+                      {awardeeData?.full_name ?? "â€”"} &middot; {days}d left &middot;{" "}
                       {new Date(g.end_date).toLocaleDateString("en-ZA")}
                     </p>
                   </div>
