@@ -118,7 +118,9 @@ function Input({
   );
 }
 
-export default function OnboardingForm() {
+type Programme = { id: string; name: string; currency_code: string; total_budget: number | null; categories: { id: string; name: string }[] };
+
+export default function OnboardingForm({ programmes: _programmes = [] }: { programmes?: Programme[] }) {
   const [state, formAction, pending] = useActionState(createAwardeeAndGrant, initialState);
   const [milestones, setMilestones] = useState<Milestone[]>([
     { title: "", due_date: "", deliverables: "" },
