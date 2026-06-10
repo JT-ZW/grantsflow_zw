@@ -1,7 +1,7 @@
-﻿import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 
-// ── Formatting ─────────────────────────────────────────────────────────────
+// -- Formatting -------------------------------------------------------------
 
 function fmtMoney(n: number, currency = "USD") {
   if (n >= 1_000_000) return `${currency} ${(n / 1_000_000).toFixed(1)}M`;
@@ -15,7 +15,7 @@ function fmtNum(n: number) {
   return n.toLocaleString();
 }
 
-// ── SVG Primitives ────────────────────────────────────────────────────────
+// -- SVG Primitives --------------------------------------------------------
 
 function MiniSparkBar({ data, color = "#ffffff" }: { data: number[]; color?: string }) {
   const max = Math.max(...data, 1);
@@ -82,15 +82,15 @@ function DonutRing({
   );
 }
 
-function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+function Card({ children, className = "", style }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
   return (
-    <div className={`rounded-2xl bg-white border border-black/[0.06] shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)] ${className}`}>
+    <div className={`rounded-2xl bg-white border border-black/[0.06] shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)] ${className}`} style={style}>
       {children}
     </div>
   );
 }
 
-// ── Types ─────────────────────────────────────────────────────────────────
+// -- Types -----------------------------------------------------------------
 
 type AwardeeRef = { id: string; full_name: string; awardee_type: string };
 type GrantFull = {
@@ -112,7 +112,7 @@ type AwardeeRow    = { id: string; awardee_type: string };
 type ProgrammeRow  = { id: string; name: string };
 type ReportRow     = { id: string; status: string; due_date: string; submitted_at: string | null; grant_id: string };
 
-// ── Page ──────────────────────────────────────────────────────────────────
+// -- Page ------------------------------------------------------------------
 
 export default async function AnalyticsPage() {
   const supabase = await createClient();
@@ -143,7 +143,7 @@ export default async function AnalyticsPage() {
   const reports       = (reportsRes.data ?? [])      as unknown as ReportRow[];
   const pendingDisbReqs = pendDisbReqRes.data ?? [];
 
-  // ── Portfolio totals ─────────────────────────────────────────────────────
+  // -- Portfolio totals -----------------------------------------------------
   const activeGrants   = grants.filter((g) => g.status === "active");
   const totalAwarded   = grants.reduce((s, g) => s + Number(g.amount_awarded), 0);
   const totalDisbursed = disbursements.reduce((s, d) => s + Number(d.amount), 0);
@@ -154,7 +154,7 @@ export default async function AnalyticsPage() {
   for (const g of grants) currencyCounts[g.currency_code] = (currencyCounts[g.currency_code] ?? 0) + 1;
   const dominantCurrency = Object.entries(currencyCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "USD";
 
-  // ── Milestone metrics ────────────────────────────────────────────────────
+  // -- Milestone metrics ----------------------------------------------------
   const msTotal     = milestones.length;
   const msCompleted = milestones.filter((m) => m.status === "completed").length;
   const msDelayed   = milestones.filter((m) => m.status === "delayed").length;
@@ -163,12 +163,12 @@ export default async function AnalyticsPage() {
   const msRate      = msTotal > 0 ? Math.round((msCompleted / msTotal) * 100) : 0;
   const ringColor   = msRate >= 70 ? "#16a34a" : msRate >= 35 ? "#d97706" : "#dc2626";
 
-  // ── Report compliance ────────────────────────────────────────────────────
+  // -- Report compliance ----------------------------------------------------
   const dueReports       = reports.filter((r) => new Date(r.due_date) < today);
   const submittedReports = dueReports.filter((r) => r.status === "submitted" || r.status === "approved");
   const complianceRate   = dueReports.length > 0 ? Math.round((submittedReports.length / dueReports.length) * 100) : null;
 
-  // ── Disbursement trend (last 6 months) ───────────────────────────────────
+  // -- Disbursement trend (last 6 months) -----------------------------------
   const monthKeys: string[] = [];
   const monthTotals: Record<string, number> = {};
   for (let i = 5; i >= 0; i--) {
@@ -185,7 +185,7 @@ export default async function AnalyticsPage() {
   const maxMonth     = Math.max(...monthEntries.map((m) => m.total), 1);
   const sparkData    = monthEntries.map((m) => m.total);
 
-  // ── Avg days to first disbursement ──────────────────────────────────────
+  // -- Avg days to first disbursement --------------------------------------
   const daysArr = grants
     .filter((g) => ["active", "completed"].includes(g.status))
     .map((g) => {
@@ -204,7 +204,7 @@ export default async function AnalyticsPage() {
     ? Math.round(daysArr.reduce((s, d) => s + d, 0) / daysArr.length)
     : null;
 
-  // ── Expense breakdown ────────────────────────────────────────────────────
+  // -- Expense breakdown ----------------------------------------------------
   const approvedExp   = expenses.filter((e) => e.status === "approved");
   const totalExpensed = approvedExp.reduce((s, e) => s + Number(e.amount), 0);
   const expByCategory: Record<string, number> = {};
@@ -212,14 +212,14 @@ export default async function AnalyticsPage() {
   const categoryEntries = Object.entries(expByCategory).sort((a, b) => b[1] - a[1]);
   const maxCategory     = categoryEntries[0]?.[1] ?? 1;
 
-  // ── Awardee type breakdown ────────────────────────────────────────────────
+  // -- Awardee type breakdown ------------------------------------------------
   const awardeeTypes = { individual: 0, team: 0, organization: 0 };
   for (const a of awardees) {
     if (a.awardee_type in awardeeTypes)
       awardeeTypes[a.awardee_type as keyof typeof awardeeTypes]++;
   }
 
-  // ── Programme performance ────────────────────────────────────────────────
+  // -- Programme performance ------------------------------------------------
   const progMap: Record<string, { name: string; gs: GrantFull[] }> = {};
   for (const p of programmes) progMap[p.id] = { name: p.name, gs: [] };
   const uncategorized: GrantFull[] = [];
@@ -246,7 +246,7 @@ export default async function AnalyticsPage() {
     })
     .sort((a, b) => b.awarded - a.awarded);
 
-  // ── Top performers ────────────────────────────────────────────────────────
+  // -- Top performers --------------------------------------------------------
   const performers = activeGrants
     .map((g) => {
       const ms   = milestones.filter((m) => m.grant_id === g.id);
@@ -257,7 +257,7 @@ export default async function AnalyticsPage() {
     .sort((a, b) => b.pct - a.pct || b.comp - a.comp)
     .slice(0, 4);
 
-  // ── Alerts ────────────────────────────────────────────────────────────────
+  // -- Alerts ----------------------------------------------------------------
   const nearingEnd = grants
     .filter((g) => {
       if (g.status !== "active") return false;
@@ -271,11 +271,11 @@ export default async function AnalyticsPage() {
   const totalAlertItems  =
     nearingEnd.length + (msOverdue > 0 ? 1 : 0) + (pendingDisbCount > 0 ? 1 : 0) + (pendingExpCount > 0 ? 1 : 0);
 
-  // ── Grant pipeline ────────────────────────────────────────────────────────
+  // -- Grant pipeline --------------------------------------------------------
   const statusGroups: Record<string, number> = { active: 0, completed: 0, suspended: 0, cancelled: 0 };
   for (const g of grants) if (g.status in statusGroups) statusGroups[g.status]++;
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   return (
     <div className="space-y-6">
@@ -294,7 +294,7 @@ export default async function AnalyticsPage() {
       {/* KPI Strip */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
 
-        {/* Hero — Portfolio Deployed */}
+        {/* Hero � Portfolio Deployed */}
         <div
           className="col-span-2 sm:col-span-1 rounded-2xl p-5 flex flex-col justify-between"
           style={{ background: "linear-gradient(145deg,#6b1a2a 0%,#3d0f19 100%)", minHeight: "116px" }}
@@ -312,7 +312,7 @@ export default async function AnalyticsPage() {
         </div>
 
         {/* Active Grants */}
-        <Card className="p-5 flex flex-col justify-between" style={{ minHeight: "116px" }}>
+        <Card className="p-5 flex flex-col justify-between min-h-[116px]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400">Active Grants</p>
           <div>
             <p className="text-[2.2rem] font-black leading-none text-gray-900">{activeGrants.length}</p>
@@ -321,7 +321,7 @@ export default async function AnalyticsPage() {
         </Card>
 
         {/* Milestone Rate */}
-        <Card className="p-5 flex flex-col justify-between" style={{ minHeight: "116px" }}>
+        <Card className="p-5 flex flex-col justify-between min-h-[116px]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400">Milestone Rate</p>
           <div>
             <p
@@ -335,11 +335,11 @@ export default async function AnalyticsPage() {
         </Card>
 
         {/* Report Compliance */}
-        <Card className="p-5 flex flex-col justify-between" style={{ minHeight: "116px" }}>
+        <Card className="p-5 flex flex-col justify-between min-h-[116px]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400">Report Compliance</p>
           <div>
             <p className="text-[2.2rem] font-black leading-none text-gray-900">
-              {complianceRate !== null ? `${complianceRate}%` : "—"}
+              {complianceRate !== null ? `${complianceRate}%` : "�"}
             </p>
             <p className="text-xs text-gray-400 mt-1">
               {dueReports.length > 0 ? `${submittedReports.length}/${dueReports.length} due` : "No reports due"}
@@ -348,11 +348,11 @@ export default async function AnalyticsPage() {
         </Card>
 
         {/* Avg Days to Disburse */}
-        <Card className="p-5 flex flex-col justify-between" style={{ minHeight: "116px" }}>
+        <Card className="p-5 flex flex-col justify-between min-h-[116px]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400">Avg Days to Disburse</p>
           <div>
             <p className="text-[2.2rem] font-black leading-none text-gray-900">
-              {avgDaysToDisb !== null ? avgDaysToDisb : "—"}
+              {avgDaysToDisb !== null ? avgDaysToDisb : "�"}
             </p>
             <p className="text-xs text-gray-400 mt-1">days from grant start</p>
           </div>
@@ -367,7 +367,7 @@ export default async function AnalyticsPage() {
           <div className="flex items-start justify-between mb-6">
             <div>
               <h2 className="text-sm font-semibold text-gray-900">Disbursement Trend</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Last 6 months · {dominantCurrency}</p>
+              <p className="text-xs text-gray-400 mt-0.5">Last 6 months � {dominantCurrency}</p>
             </div>
             <div className="text-right">
               <p className="text-xl font-bold text-gray-900">{fmtMoney(totalDisbursed, dominantCurrency)}</p>
@@ -584,7 +584,7 @@ export default async function AnalyticsPage() {
             <div className="flex items-center justify-between mb-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-400">Expense Accountability</p>
               <span className="text-sm font-bold text-gray-900">
-                {totalDisbursed > 0 ? `${Math.round((totalExpensed / totalDisbursed) * 100)}%` : "—"}
+                {totalDisbursed > 0 ? `${Math.round((totalExpensed / totalDisbursed) * 100)}%` : "�"}
               </span>
             </div>
             <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
@@ -663,7 +663,7 @@ export default async function AnalyticsPage() {
                         <span className="text-sm font-bold whitespace-nowrap" style={{ color: barColor }}>{p.pct}%</span>
                       </div>
                       <p className="text-xs text-gray-400 mb-2">
-                        {p.awardee?.full_name ?? "—"} &middot; {p.comp}/{p.total} milestones
+                        {p.awardee?.full_name ?? "�"} &middot; {p.comp}/{p.total} milestones
                       </p>
                       <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
                         <div className="h-full rounded-full" style={{ width: `${p.pct}%`, backgroundColor: barColor }} />
@@ -694,13 +694,13 @@ export default async function AnalyticsPage() {
                 className="group flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3.5 hover:bg-blue-100 transition-colors"
               >
                 <span className="flex-shrink-0 mt-0.5 w-8 h-8 rounded-lg bg-blue-100 group-hover:bg-blue-200 flex items-center justify-center text-sm transition-colors">
-                  💸
+                  ??
                 </span>
                 <div>
                   <p className="text-sm font-semibold text-blue-900">
                     {pendingDisbCount} Disbursement Request{pendingDisbCount !== 1 ? "s" : ""}
                   </p>
-                  <p className="text-xs text-blue-600 mt-0.5">Awaiting approval · Finances</p>
+                  <p className="text-xs text-blue-600 mt-0.5">Awaiting approval � Finances</p>
                 </div>
               </Link>
             )}
@@ -710,20 +710,20 @@ export default async function AnalyticsPage() {
                 className="group flex items-start gap-3 rounded-xl border border-yellow-100 bg-yellow-50 px-4 py-3.5 hover:bg-yellow-100 transition-colors"
               >
                 <span className="flex-shrink-0 mt-0.5 w-8 h-8 rounded-lg bg-yellow-100 group-hover:bg-yellow-200 flex items-center justify-center text-sm transition-colors">
-                  🧾
+                  ??
                 </span>
                 <div>
                   <p className="text-sm font-semibold text-yellow-900">
                     {pendingExpCount} Pending Expense{pendingExpCount !== 1 ? "s" : ""}
                   </p>
-                  <p className="text-xs text-yellow-600 mt-0.5">Awaiting review · Finances</p>
+                  <p className="text-xs text-yellow-600 mt-0.5">Awaiting review � Finances</p>
                 </div>
               </Link>
             )}
             {msOverdue > 0 && (
               <div className="flex items-start gap-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3.5">
                 <span className="flex-shrink-0 mt-0.5 w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center text-sm">
-                  ⏰
+                  ?
                 </span>
                 <div>
                   <p className="text-sm font-semibold text-red-900">
@@ -743,12 +743,12 @@ export default async function AnalyticsPage() {
                   className="group flex items-start gap-3 rounded-xl border border-orange-100 bg-orange-50 px-4 py-3.5 hover:bg-orange-100 transition-colors"
                 >
                   <span className="flex-shrink-0 mt-0.5 w-8 h-8 rounded-lg bg-orange-100 group-hover:bg-orange-200 flex items-center justify-center text-sm transition-colors">
-                    📅
+                    ??
                   </span>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-orange-900 truncate">{g.title}</p>
                     <p className="text-xs text-orange-600 mt-0.5">
-                      {awardeeData?.full_name ?? "—"} &middot; {days}d left &middot;{" "}
+                      {awardeeData?.full_name ?? "�"} &middot; {days}d left &middot;{" "}
                       {new Date(g.end_date).toLocaleDateString("en-ZA")}
                     </p>
                   </div>
