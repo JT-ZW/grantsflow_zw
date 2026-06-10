@@ -1,6 +1,14 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AfricaMap } from "./AfricaMap";
 
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-2xl bg-white border border-black/[0.06] shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)] ${className}`}>
+      {children}
+    </div>
+  );
+}
+
 const SDG_LABELS: Record<number, string> = {
   1: "No Poverty", 2: "Zero Hunger", 3: "Good Health", 4: "Quality Education",
   5: "Gender Equality", 6: "Clean Water", 7: "Affordable Energy", 8: "Decent Work",
@@ -20,10 +28,15 @@ export default async function ImpactPage() {
   const supabase = createAdminClient();
 
   // Fetch all grants with impact classification fields
-  const { data: grants } = await supabase
-    .from("grants")
-    .select("id, title, status, sectors, sdg_goals, country_codes, geographic_scope, amount_awarded, currency_code")
-    .not("status", "eq", "cancelled");
+  const [{ data: grants }, { data: awardeeGenders }] = await Promise.all([
+    supabase
+      .from("grants")
+      .select("id, title, status, sectors, sdg_goals, country_codes, geographic_scope, amount_awarded, currency_code")
+      .not("status", "eq", "cancelled"),
+    supabase
+      .from("awardees")
+      .select("id, gender"),
+  ]);
 
   const allGrants = grants ?? [];
   const activeGrants = allGrants.filter((g) => g.status === "active");
@@ -53,6 +66,17 @@ export default async function ImpactPage() {
   }
   const activeCountryCodes = Object.keys(grantsByCountry);
 
+  // Aggregate gender breakdown
+  const genderRaw = (awardeeGenders ?? []) as { id: string; gender: string | null }[];
+  const genderCounts = {
+    female:          genderRaw.filter((a) => a.gender === "female").length,
+    male:            genderRaw.filter((a) => a.gender === "male").length,
+    non_binary:      genderRaw.filter((a) => a.gender === "non_binary").length,
+    prefer_not_to_say: genderRaw.filter((a) => a.gender === "prefer_not_to_say").length,
+    unspecified:     genderRaw.filter((a) => !a.gender || a.gender === "").length,
+  };
+  const totalAwardees = genderRaw.length;
+
   // Fetch indicators + actuals for Layer 2 summary
   const { data: indicators } = await supabase
     .from("grant_impact_indicators")
@@ -74,44 +98,77 @@ export default async function ImpactPage() {
 
   const totalAmountAwarded = activeGrants.reduce((s, g) => s + (g.amount_awarded ?? 0), 0);
 
+  // Dominant currency
+  const currencyCounts: Record<string, number> = {};
+  for (const g of activeGrants) currencyCounts[g.currency_code] = (currencyCounts[g.currency_code] ?? 0) + 1;
+  const dominantCurrency = Object.entries(currencyCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "USD";
+
+  function fmtMoney(n: number, currency = "USD") {
+    if (n >= 1_000_000) return `${currency} ${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${currency} ${(n / 1_000).toFixed(0)}k`;
+    return `${currency} ${n.toLocaleString("en-ZA", { minimumFractionDigits: 0 })}`;
+  }
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Impact Reporting</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Aggregate view of sector coverage, SDG alignment, geographic reach, and reported outcomes.
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Impact Reporting</h1>
+          <p className="text-sm text-gray-400 mt-0.5">
+            Sector coverage, SDG alignment, geographic reach, and reported outcomes.
+          </p>
+        </div>
+      </div>
+
+      {/* Hero impact statement */}
+      <div
+        className="rounded-2xl p-6 text-white"
+        style={{ background: "linear-gradient(135deg,#6b1a2a 0%,#3d0f19 100%)" }}
+      >
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/50 mb-3">Portfolio at a Glance</p>
+        <p className="text-xl sm:text-2xl font-bold text-white leading-snug">
+          Supporting <span className="text-white font-black">{totalAwardees}</span> awardee{totalAwardees !== 1 ? "s" : ""} across{" "}
+          <span className="text-white font-black">{activeCountryCodes.length}</span> countr{activeCountryCodes.length !== 1 ? "ies" : "y"} with{" "}
+          <span className="text-white font-black">{fmtMoney(totalAmountAwarded, dominantCurrency)}</span> invested
+          {Object.keys(sectorCounts).length > 0 && (
+            <> across <span className="text-white font-black">{Object.keys(sectorCounts).length}</span> sector{Object.keys(sectorCounts).length !== 1 ? "s" : ""}</>
+          )}
+          {Object.keys(sdgCounts).length > 0 && (
+            <>, aligned to <span className="text-white font-black">{Object.keys(sdgCounts).length}</span> SDG{Object.keys(sdgCounts).length !== 1 ? "s" : ""}</>
+          )}.
         </p>
       </div>
 
-      {/* Stat row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
-          { label: "Active Grants", value: activeGrants.length },
-          { label: "Countries Reached", value: activeCountryCodes.length },
-          { label: "Sectors Covered", value: Object.keys(sectorCounts).length },
-          { label: "SDGs Addressed", value: Object.keys(sdgCounts).length },
+          { label: "Active Grants",    value: activeGrants.length },
+          { label: "Total Awardees",   value: totalAwardees },
+          { label: "Countries Reached",value: activeCountryCodes.length },
+          { label: "Sectors Covered",  value: Object.keys(sectorCounts).length },
+          { label: "SDGs Addressed",   value: Object.keys(sdgCounts).length },
         ].map((s) => (
-          <div key={s.label} className="rounded-xl border border-gray-200 bg-white p-5">
-            <p className="text-xs text-gray-400">{s.label}</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">{s.value}</p>
-          </div>
+          <Card key={s.label} className="p-5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400">{s.label}</p>
+            <p className="text-3xl font-black text-gray-900 mt-1.5">{s.value}</p>
+          </Card>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Africa Map */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">Geographic Reach</h2>
+        <Card className="p-6">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Geographic Reach</h2>
           <AfricaMap grantsByCountry={grantsByCountry} />
           <p className="mt-3 text-xs text-gray-400 text-center">
             {activeCountryCodes.length} countr{activeCountryCodes.length !== 1 ? "ies" : "y"} with active grant activity
           </p>
-        </div>
+        </Card>
 
         {/* SDG Grid */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">SDG Coverage</h2>
+        <Card className="p-6">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">SDG Alignment</h2>
           <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
             {Array.from({ length: 17 }, (_, i) => i + 1).map((n) => {
               const count = sdgCounts[n] ?? 0;
@@ -131,13 +188,13 @@ export default async function ImpactPage() {
               );
             })}
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* Sector breakdown */}
       {Object.keys(sectorCounts).length > 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">Sector Breakdown</h2>
+        <Card className="p-6">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Sector Breakdown</h2>
           <div className="space-y-2.5">
             {Object.entries(sectorCounts)
               .sort(([, a], [, b]) => b - a)
@@ -157,13 +214,53 @@ export default async function ImpactPage() {
                 );
               })}
           </div>
-        </div>
+        </Card>
+      )}
+
+      {/* Gender breakdown */}
+      {totalAwardees > 0 && (
+        <Card className="p-6">
+          <h2 className="text-sm font-semibold text-gray-900 mb-1">Gender Breakdown</h2>
+          <p className="text-xs text-gray-400 mb-5">Disaggregated by awardee gender across all registered awardees.</p>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
+            {[
+              { label: "Female-led",    count: genderCounts.female,          color: "#be185d" },
+              { label: "Male-led",      count: genderCounts.male,            color: "#1d4ed8" },
+              { label: "Non-binary",    count: genderCounts.non_binary,      color: "#7c3aed" },
+              { label: "Undisclosed",   count: genderCounts.prefer_not_to_say + genderCounts.unspecified, color: "#6b7280" },
+            ].map((g) => {
+              const pct = totalAwardees > 0 ? Math.round((g.count / totalAwardees) * 100) : 0;
+              return (
+                <div key={g.label} className="rounded-xl bg-gray-50 border border-gray-100 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: g.color }} />
+                    <span className="text-xs text-gray-500">{g.label}</span>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">{g.count}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{pct}% of awardees</p>
+                  <div className="mt-3 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: g.color }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {genderCounts.female > 0 && (
+            <div className="rounded-lg bg-pink-50 border border-pink-100 px-4 py-3 flex items-center gap-3">
+              <span className="text-pink-600 text-lg">♀</span>
+              <p className="text-sm text-pink-800">
+                <strong>{genderCounts.female}</strong> female-led awardee{genderCounts.female !== 1 ? "s" : ""} —{" "}
+                {Math.round((genderCounts.female / totalAwardees) * 100)}% of your portfolio. Strong on gender equity.
+              </p>
+            </div>
+          )}
+        </Card>
       )}
 
       {/* Indicator actuals (Layer 2) */}
       {indicatorSummary.length > 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">Quantitative Outcomes</h2>
+        <Card className="p-6">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Quantitative Outcomes</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -201,32 +298,40 @@ export default async function ImpactPage() {
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Impact narratives (Layer 3) */}
       {(stories ?? []).length > 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">Impact Stories</h2>
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">Impact Stories</h2>
+              <p className="text-xs text-gray-400 mt-0.5">First-hand narratives from milestone submissions</p>
+            </div>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {(stories ?? []).map((s) => {
               const milestone = (s.milestones as unknown as { title: string; grants: { title: string } | null } | null);
               return (
-                <div key={s.id} className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+                <div key={s.id} className="rounded-xl border border-gray-100 bg-gray-50/70 p-5 flex flex-col gap-3">
                   {milestone && (
-                    <p className="text-xs font-medium text-[#6b1a2a] mb-1 truncate">
-                      {milestone.grants?.title ?? ""} · {milestone.title}
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#6b1a2a]" />
+                      <p className="text-xs font-semibold text-[#6b1a2a] truncate">
+                        {milestone.grants?.title ?? ""} · {milestone.title}
+                      </p>
+                    </div>
                   )}
-                  <p className="text-sm text-gray-700 leading-relaxed line-clamp-4">{s.impact_story}</p>
-                  <p className="text-xs text-gray-400 mt-2">
-                    {new Date(s.created_at).toLocaleDateString("en-ZA")}
+                  <p className="text-sm text-gray-700 leading-relaxed line-clamp-5 flex-1">&ldquo;{s.impact_story}&rdquo;</p>
+                  <p className="text-[10px] text-gray-400 font-medium">
+                    {new Date(s.created_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
                 </div>
               );
             })}
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );

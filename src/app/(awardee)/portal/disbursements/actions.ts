@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-const CURRENCIES = ["ZAR", "USD", "EUR", "GBP"] as const;
+const CURRENCIES = ["ZiG", "USD", "ZAR", "EUR", "GBP"] as const;
 
 const disbursementSchema = z.object({
   amount:        z.coerce.number().positive("Amount must be a positive number"),

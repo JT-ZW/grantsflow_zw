@@ -30,7 +30,7 @@ const BUDGET_CATEGORIES = [
   "Other",
 ];
 
-const CURRENCIES = ["ZAR", "USD", "EUR", "GBP"];
+const CURRENCIES = ["ZiG", "USD", "ZAR", "EUR", "GBP"];
 
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString("en-ZA", {

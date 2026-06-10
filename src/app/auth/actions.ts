@@ -39,6 +39,24 @@ export async function logout() {
   redirect("/auth/login");
 }
 
+export async function requestPasswordReset(formData: FormData) {
+  const email = (formData.get("email") as string)?.trim();
+  if (!email) {
+    redirect("/auth/forgot-password?error=Please+enter+your+email+address");
+  }
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const supabase = await createClient();
+
+  // Supabase sends the reset email. We always redirect to "success" regardless
+  // of whether the email exists (prevents user enumeration).
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteUrl}/auth/reset-callback`,
+  });
+
+  redirect("/auth/forgot-password?success=1");
+}
+
 export async function setPassword(formData: FormData) {
   const password = formData.get("password") as string;
   const confirmPassword = formData.get("confirm_password") as string;
@@ -52,6 +70,13 @@ export async function setPassword(formData: FormData) {
   }
 
   const supabase = await createClient();
+
+  // Ensure the user has a valid session (invite exchange must have happened)
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    redirect("/auth/set-password?error=Session+expired+%E2%80%94+please+click+your+invite+link+again");
+  }
+
   const { error } = await supabase.auth.updateUser({ password });
 
   if (error) {
@@ -60,5 +85,15 @@ export async function setPassword(formData: FormData) {
     );
   }
 
-  redirect("/portal");
+  // Redirect based on role so admins who were invited go to dashboard, not portal
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role === "awardee") {
+    redirect("/portal");
+  }
+  redirect("/dashboard");
 }

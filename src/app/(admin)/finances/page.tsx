@@ -9,17 +9,11 @@ function parseDate(d: string) {
   return new Date(d + "T12:00:00").toLocaleDateString("en-ZA");
 }
 
-const EXPENSE_STATUS_STYLES: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-700",
-  approved: "bg-green-100 text-green-700",
-  rejected: "bg-red-100 text-red-700",
-};
-
 export default async function FinancesPage() {
   const supabase = await createClient();
 
   // Load everything in parallel
-  const [awardeesRes, budgetsRes, disbursementsRes, expensesRes] =
+  const [awardeesRes, budgetsRes, disbursementsRes, expensesRes, disbRequestsRes] =
     await Promise.all([
       supabase
         .from("awardees")
@@ -33,12 +27,18 @@ export default async function FinancesPage() {
         .from("expenses")
         .select("*")
         .order("expense_date", { ascending: false }),
+      supabase
+        .from("disbursement_requests")
+        .select("id, grant_id, amount, currency_code, status, justification, created_at")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false }),
     ]);
 
   const awardees = awardeesRes.data ?? [];
   const budgets = budgetsRes.data ?? [];
   const disbursements = disbursementsRes.data ?? [];
   const expenses = expensesRes.data ?? [];
+  const pendingDisbRequests = disbRequestsRes.data ?? [];
 
   // Portfolio-wide totals
   const totalAwarded = awardees.reduce((s, a) => {
@@ -71,7 +71,9 @@ export default async function FinancesPage() {
     disbursed: number;
     expApproved: number;
     expPending: number;
+    remaining: number;
     balance: number;
+    utilizationPct: number;
   };
 
   const awardeeRows: AwardeeRow[] = [];
@@ -89,6 +91,10 @@ export default async function FinancesPage() {
       (e) => e.grant_id === grant.id && e.status === "pending"
     ).length;
     const balance = disbursed - expApproved;
+    const remaining = Number(grant.amount_awarded) - disbursed;
+    const utilizationPct = grant.amount_awarded > 0
+      ? Math.min(100, Math.round((disbursed / Number(grant.amount_awarded)) * 100))
+      : 0;
 
     awardeeRows.push({
       id: a.id,
@@ -98,41 +104,107 @@ export default async function FinancesPage() {
       disbursed,
       expApproved,
       expPending,
+      remaining,
       balance,
+      utilizationPct,
     });
   }
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Finances</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Portfolio-wide financial overview</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Finances</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Portfolio-wide financial overview</p>
+        </div>
       </div>
 
       {/* Portfolio summary */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {[
-          { label: "Total Awarded", value: fmt(totalAwarded), note: `across ${awardees.length} awardee${awardees.length !== 1 ? "s" : ""}` },
-          { label: "Approved Budget", value: fmt(totalBudgeted), note: null },
-          { label: "Total Disbursed", value: fmt(totalDisbursed), note: null },
-          {
-            label: "Expenses Approved",
-            value: fmt(totalExpensesApproved),
-            note: pendingExpenses.length > 0 ? `${pendingExpenses.length} pending review` : null,
-            alert: pendingExpenses.length > 0,
-          },
-        ].map((s) => (
-          <div key={s.label} className="rounded-xl border border-gray-200 bg-white p-5">
-            <p className="text-xs font-medium text-gray-500">{s.label}</p>
-            <p className="mt-1 text-xl font-bold text-gray-900">{s.value}</p>
-            {s.note && (
-              <p className={`text-xs mt-0.5 ${s.alert ? "text-yellow-600" : "text-gray-400"}`}>
-                {s.note}
+      {(() => {
+        const deployedPct = totalAwarded > 0 ? Math.round((totalDisbursed / totalAwarded) * 100) : 0;
+        return (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+            {[
+              { label: "Total Awarded", value: fmt(totalAwarded), note: `across ${awardees.length} awardee${awardees.length !== 1 ? "s" : ""}` },
+              { label: "Approved Budget", value: fmt(totalBudgeted), note: null },
+              { label: "Total Disbursed", value: fmt(totalDisbursed), note: null },
+              { label: "% Deployed", value: `${deployedPct}%`, note: "of total portfolio" },
+              {
+                label: "Expenses Approved",
+                value: fmt(totalExpensesApproved),
+                note: pendingExpenses.length > 0 ? `${pendingExpenses.length} pending review` : null,
+                alert: pendingExpenses.length > 0,
+              },
+            ].map((s) => (
+              <div key={s.label} className="rounded-xl border border-gray-200 bg-white p-5">
+                <p className="text-xs font-medium text-gray-500">{s.label}</p>
+                <p className="mt-1 text-xl font-bold text-gray-900">{s.value}</p>
+                {s.note && (
+                  <p className={`text-xs mt-0.5 ${"alert" in s && s.alert ? "text-yellow-600" : "text-gray-400"}`}>
+                    {s.note}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* Pending disbursement requests from awardees */}
+      {pendingDisbRequests.length > 0 && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-blue-900">
+              Disbursement Requests Awaiting Approval ({pendingDisbRequests.length})
+            </h2>
+          </div>
+          <div className="space-y-2">
+            {pendingDisbRequests.slice(0, 6).map((req) => {
+              const awardee = awardees.find((a) => {
+                const grants = a.grants as { id: string }[] | null;
+                return grants?.[0]?.id === req.grant_id;
+              });
+              const grant = (awardee?.grants as { id: string; title: string }[] | null)?.[0];
+              return (
+                <div
+                  key={req.id}
+                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-lg bg-white border border-blue-100 px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {awardee?.full_name ?? "Unknown"} — {grant?.title ?? "—"}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">
+                      {req.justification?.slice(0, 90)}{(req.justification?.length ?? 0) > 90 ? "…" : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <p className="text-sm font-semibold text-gray-900">
+                      {fmt(Number(req.amount), req.currency_code)}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(req.created_at).toLocaleDateString("en-ZA")}
+                    </p>
+                    {awardee && (
+                      <Link
+                        href={`/awardees/${awardee.id}/finances`}
+                        className="text-xs font-medium text-blue-600 hover:underline whitespace-nowrap"
+                      >
+                        Review →
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {pendingDisbRequests.length > 6 && (
+              <p className="text-xs text-blue-700 text-center pt-1">
+                +{pendingDisbRequests.length - 6} more — open individual awardee pages to process
               </p>
             )}
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
       {/* Pending expense reviews */}
       {pendingExpenses.length > 0 && (
@@ -197,8 +269,9 @@ export default async function FinancesPage() {
                   <th className="pb-2 text-left text-xs font-medium text-gray-500">Grant</th>
                   <th className="pb-2 text-right text-xs font-medium text-gray-500">Awarded</th>
                   <th className="pb-2 text-right text-xs font-medium text-gray-500">Disbursed</th>
+                  <th className="pb-2 text-right text-xs font-medium text-gray-500">Remaining</th>
                   <th className="pb-2 text-right text-xs font-medium text-gray-500">Exp. Approved</th>
-                  <th className="pb-2 text-right text-xs font-medium text-gray-500">Balance</th>
+                  <th className="pb-2 text-left text-xs font-medium text-gray-500 pl-4">Utilization</th>
                   <th className="pb-2 text-center text-xs font-medium text-gray-500">Pending Exp.</th>
                   <th className="pb-2" />
                 </tr>
@@ -206,30 +279,46 @@ export default async function FinancesPage() {
               <tbody className="divide-y divide-gray-50">
                 {awardeeRows.map((row) => {
                   const currency = row.grant.currency_code;
+                  const barColor =
+                    row.utilizationPct >= 90 ? "#dc2626"
+                    : row.utilizationPct >= 60 ? "#d97706"
+                    : "#16a34a";
                   return (
                     <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-3">
-                        <p className="font-medium text-gray-900">{row.full_name}</p>
+                      <td className="py-3 pr-4">
+                        <p className="font-medium text-gray-900 whitespace-nowrap">{row.full_name}</p>
                         <p className="text-xs text-gray-400">{row.email}</p>
                       </td>
-                      <td className="py-3 text-gray-600 max-w-[180px] truncate">
-                        {row.grant.title}
+                      <td className="py-3 pr-4 max-w-[180px]">
+                        <Link
+                          href={`/awardees/${row.id}/finances`}
+                          className="text-gray-700 hover:text-[#6b1a2a] hover:underline truncate block"
+                        >
+                          {row.grant.title}
+                        </Link>
                       </td>
-                      <td className="py-3 text-right text-gray-900">
+                      <td className="py-3 text-right text-gray-900 whitespace-nowrap">
                         {fmt(Number(row.grant.amount_awarded), currency)}
                       </td>
-                      <td className="py-3 text-right text-gray-900">
+                      <td className="py-3 text-right text-gray-900 whitespace-nowrap">
                         {fmt(row.disbursed, currency)}
                       </td>
-                      <td className="py-3 text-right text-gray-900">
+                      <td className={`py-3 text-right font-medium whitespace-nowrap ${row.remaining < 0 ? "text-red-600" : "text-gray-700"}`}>
+                        {fmt(row.remaining, currency)}
+                      </td>
+                      <td className="py-3 text-right text-gray-600 whitespace-nowrap">
                         {fmt(row.expApproved, currency)}
                       </td>
-                      <td
-                        className={`py-3 text-right font-medium ${
-                          row.balance < 0 ? "text-red-600" : "text-gray-900"
-                        }`}
-                      >
-                        {fmt(row.balance, currency)}
+                      <td className="py-3 pl-4 w-36">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{ width: `${row.utilizationPct}%`, backgroundColor: barColor }}
+                            />
+                          </div>
+                          <span className="text-xs text-gray-400 w-8 text-right">{row.utilizationPct}%</span>
+                        </div>
                       </td>
                       <td className="py-3 text-center">
                         {row.expPending > 0 ? (

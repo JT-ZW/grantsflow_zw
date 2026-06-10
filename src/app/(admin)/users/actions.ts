@@ -57,7 +57,7 @@ export async function inviteUser(_prev: InviteState, formData: FormData): Promis
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
     data: { full_name },
-    redirectTo: `${siteUrl}/auth/callback`,
+    redirectTo: `${siteUrl}/auth/invite-callback`,
   });
 
   if (inviteError) return { error: inviteError.message };

@@ -16,7 +16,7 @@ const STATUS_LABELS: Record<string, string> = {
   processed: "Processed",
 };
 
-const CURRENCIES = ["ZAR", "USD", "EUR", "GBP"];
+const CURRENCIES = ["ZiG", "USD", "ZAR", "EUR", "GBP"];
 
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString("en-ZA", {
@@ -201,7 +201,7 @@ export default async function DisbursementsPage({
               </label>
               <select
                 name="currency_code"
-                defaultValue={grant.currency_code ?? "ZAR"}
+                defaultValue={grant.currency_code ?? "ZiG"}
                 className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#6b1a2a]"
               >
                 {CURRENCIES.map((c) => (

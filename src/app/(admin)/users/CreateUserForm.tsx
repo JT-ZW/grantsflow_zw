@@ -52,7 +52,7 @@ export function CreateUserForm() {
             type="email"
             name="email"
             required
-            placeholder="jane@university.ac.za"
+            placeholder="johndoe@gmail.com"
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
         </div>

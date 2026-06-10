@@ -15,7 +15,7 @@ const EXPENSE_CATEGORIES = [
   "Other",
 ] as const;
 
-const CURRENCIES = ["ZAR", "USD", "EUR", "GBP"] as const;
+const CURRENCIES = ["ZiG", "USD", "ZAR", "EUR", "GBP"] as const;
 
 const submitExpenseSchema = z.object({
   grant_id: z.string().uuid(),

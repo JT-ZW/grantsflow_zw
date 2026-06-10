@@ -20,7 +20,7 @@ const BUDGET_CATEGORIES = [
   "Other",
 ];
 
-const CURRENCIES = ["ZAR", "USD", "EUR", "GBP"];
+const CURRENCIES = ["ZiG", "USD", "ZAR", "EUR", "GBP"];
 const METHODS = ["EFT", "Cash", "Cheque", "Mobile Money", "Other"];
 
 const EXPENSE_STATUS_STYLES: Record<string, string> = {

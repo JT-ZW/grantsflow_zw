@@ -16,52 +16,7 @@ const GRANT_TYPES = [
   "Other",
 ];
 
-const CURRENCIES = [
-  // Top priorities
-  { code: "USD", label: "USD – US Dollar" },
-  { code: "ZIG", label: "ZIG – Zimbabwe Gold" },
-  // Africa
-  { code: "ZAR", label: "ZAR – South African Rand" },
-  { code: "KES", label: "KES – Kenyan Shilling" },
-  { code: "NGN", label: "NGN – Nigerian Naira" },
-  { code: "GHS", label: "GHS – Ghanaian Cedi" },
-  { code: "EGP", label: "EGP – Egyptian Pound" },
-  { code: "ETB", label: "ETB – Ethiopian Birr" },
-  { code: "TZS", label: "TZS – Tanzanian Shilling" },
-  { code: "UGX", label: "UGX – Ugandan Shilling" },
-  { code: "RWF", label: "RWF – Rwandan Franc" },
-  { code: "ZMW", label: "ZMW – Zambian Kwacha" },
-  { code: "BWP", label: "BWP – Botswana Pula" },
-  { code: "MWK", label: "MWK – Malawian Kwacha" },
-  { code: "MZN", label: "MZN – Mozambican Metical" },
-  { code: "NAD", label: "NAD – Namibian Dollar" },
-  { code: "MAD", label: "MAD – Moroccan Dirham" },
-  { code: "TND", label: "TND – Tunisian Dinar" },
-  { code: "DZD", label: "DZD – Algerian Dinar" },
-  { code: "XOF", label: "XOF – West African CFA Franc" },
-  { code: "XAF", label: "XAF – Central African CFA Franc" },
-  // Europe
-  { code: "EUR", label: "EUR – Euro" },
-  { code: "GBP", label: "GBP – British Pound" },
-  { code: "CHF", label: "CHF – Swiss Franc" },
-  { code: "SEK", label: "SEK – Swedish Krona" },
-  { code: "NOK", label: "NOK – Norwegian Krone" },
-  { code: "DKK", label: "DKK – Danish Krone" },
-  // Americas
-  { code: "CAD", label: "CAD – Canadian Dollar" },
-  { code: "BRL", label: "BRL – Brazilian Real" },
-  { code: "MXN", label: "MXN – Mexican Peso" },
-  // Asia-Pacific
-  { code: "JPY", label: "JPY – Japanese Yen" },
-  { code: "CNY", label: "CNY – Chinese Yuan" },
-  { code: "INR", label: "INR – Indian Rupee" },
-  { code: "AUD", label: "AUD – Australian Dollar" },
-  { code: "NZD", label: "NZD – New Zealand Dollar" },
-  { code: "SGD", label: "SGD – Singapore Dollar" },
-  { code: "HKD", label: "HKD – Hong Kong Dollar" },
-  { code: "AED", label: "AED – UAE Dirham" },
-  { code: "SAR", label: "SAR – Saudi Riyal" },
-];
+const CURRENCIES = ["ZiG", "USD", "ZAR", "EUR", "GBP"];
 
 const SECTORS = [
   "Climate & Environment",
@@ -163,15 +118,7 @@ function Input({
   );
 }
 
-type Programme = {
-  id: string;
-  name: string;
-  currency_code: string;
-  total_budget: number | null;
-  categories: { id: string; name: string }[];
-};
-
-export default function OnboardingForm({ programmes }: { programmes: Programme[] }) {
+export default function OnboardingForm() {
   const [state, formAction, pending] = useActionState(createAwardeeAndGrant, initialState);
   const [milestones, setMilestones] = useState<Milestone[]>([
     { title: "", due_date: "", deliverables: "" },
@@ -179,9 +126,6 @@ export default function OnboardingForm({ programmes }: { programmes: Programme[]
   const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
   const [selectedSdgs, setSelectedSdgs] = useState<number[]>([]);
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
-  const [selectedProgrammeId, setSelectedProgrammeId] = useState("");
-  const [sendInvite, setSendInvite] = useState(true);
-  const [teamEmails, setTeamEmails] = useState<string[]>([]);
 
   function toggleSector(s: string) {
     setSelectedSectors((prev) =>
@@ -246,7 +190,7 @@ export default function OnboardingForm({ programmes }: { programmes: Programme[]
           </div>
           <div>
             <Label htmlFor="email" required>Email address</Label>
-            <Input id="email" name="email" type="email" placeholder="jane@university.ac.za" required />
+            <Input id="email" name="email" type="email" placeholder="johndoe@gmail.com" required />
             <FieldError errors={state.errors?.email} />
           </div>
           <div>
@@ -265,6 +209,22 @@ export default function OnboardingForm({ programmes }: { programmes: Programme[]
               <option value="team">Team</option>
               <option value="organization">Organization</option>
             </select>
+          </div>
+          <div>
+            <Label htmlFor="gender">Gender</Label>
+            <select
+              id="gender"
+              name="gender"
+              defaultValue=""
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Not specified</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+              <option value="non_binary">Non-binary</option>
+              <option value="prefer_not_to_say">Prefer not to say</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-400">Used for gender-disaggregated impact reporting.</p>
           </div>
           <div>
             <Label htmlFor="student_number">Student / Staff number</Label>
@@ -287,7 +247,7 @@ export default function OnboardingForm({ programmes }: { programmes: Programme[]
           </div>
           <div>
             <Label htmlFor="supervisor_email">Supervisor email</Label>
-            <Input id="supervisor_email" name="supervisor_email" type="email" placeholder="mokoena@university.ac.za" />
+            <Input id="supervisor_email" name="supervisor_email" type="email" placeholder="supervisor@gmail.com" />
             <FieldError errors={state.errors?.supervisor_email} />
           </div>
         </div>
@@ -296,51 +256,6 @@ export default function OnboardingForm({ programmes }: { programmes: Programme[]
       {/* ── GRANT DETAILS ────────────────────────────────── */}
       <div className={sectionClass}>
         <h2 className={sectionTitle}>Grant Details</h2>
-
-        {programmes.length > 0 && (
-          <div>
-            <Label htmlFor="programme_id">Programme</Label>
-            <select
-              id="programme_id"
-              name="programme_id"
-              value={selectedProgrammeId}
-              onChange={(e) => setSelectedProgrammeId(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#6b1a2a]"
-            >
-              <option value="">None — not part of a programme</option>
-              {programmes.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}{p.total_budget ? ` (${p.currency_code} ${Number(p.total_budget).toLocaleString()} total)` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Category — only shown when the selected programme has categories */}
-        {(() => {
-          const prog = programmes.find((p) => p.id === selectedProgrammeId);
-          const cats = prog?.categories ?? [];
-          if (cats.length === 0) return null;
-          return (
-            <div>
-              <Label htmlFor="category_id" required>Category</Label>
-              <select
-                id="category_id"
-                name="category_id"
-                required
-                defaultValue=""
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#6b1a2a]"
-              >
-                <option value="" disabled>Select a category…</option>
-                {cats.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              <FieldError errors={state.errors?.category_id} />
-            </div>
-          );
-        })()}
 
         <div>
           <Label htmlFor="grant_title" required>Grant title</Label>
@@ -382,12 +297,10 @@ export default function OnboardingForm({ programmes }: { programmes: Programme[]
             <div className="flex gap-2">
               <select
                 name="currency_code"
-                defaultValue="USD"
-                className="rounded-lg border border-gray-300 px-2 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#6b1a2a]"
+                defaultValue="ZiG"
+                className="rounded-lg border border-gray-300 px-2 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {CURRENCIES.map(({ code, label }) => (
-                  <option key={code} value={code}>{label}</option>
-                ))}
+                {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
               </select>
               <Input
                 id="amount_awarded"
@@ -592,78 +505,6 @@ export default function OnboardingForm({ programmes }: { programmes: Programme[]
         </div>
       </div>
 
-      {/* ── PORTAL ACCESS ─────────────────────────────── */}
-      <div className={sectionClass}>
-        <h2 className={sectionTitle}>Portal Access</h2>
-        <p className="text-sm text-gray-500 mb-4">
-          The awardee will receive a set-password invitation email giving them access to their grant portal.
-          You can also invite additional team members who will share the same portal view.
-        </p>
-
-        {/* Primary invite toggle */}
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            name="send_invite"
-            value="true"
-            checked={sendInvite}
-            onChange={(e) => setSendInvite(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-[#6b1a2a] focus:ring-[#6b1a2a]"
-          />
-          <span className="text-sm text-gray-700">
-            Send portal invite to primary contact immediately
-          </span>
-        </label>
-
-        {/* Team members */}
-        <div className="mt-5">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium text-gray-700">
-              Team members{" "}
-              <span className="text-xs text-gray-400 font-normal">(optional — each will receive a separate invite)</span>
-            </p>
-            {teamEmails.length < 4 && (
-              <button
-                type="button"
-                onClick={() => setTeamEmails([...teamEmails, ""])}
-                className="text-xs text-[#6b1a2a] hover:underline font-medium"
-              >
-                + Add team member
-              </button>
-            )}
-          </div>
-
-          {teamEmails.length === 0 && (
-            <p className="text-xs text-gray-400 italic">No team members added. Click &quot;+ Add team member&quot; to invite collaborators.</p>
-          )}
-
-          {teamEmails.map((email, i) => (
-            <div key={i} className="flex items-center gap-2 mb-2">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => {
-                  const updated = [...teamEmails];
-                  updated[i] = e.target.value;
-                  setTeamEmails(updated);
-                }}
-                placeholder="colleague@university.ac.za"
-                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6b1a2a]"
-              />
-              <button
-                type="button"
-                onClick={() => setTeamEmails(teamEmails.filter((_, idx) => idx !== i))}
-                className="text-sm text-gray-400 hover:text-red-500 px-1"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-
-        <input type="hidden" name="team_members_json" value={JSON.stringify(teamEmails.filter(Boolean))} />
-      </div>
-
       {/* ── SUBMIT ──────────────────────────────────────── */}
       <div className="flex items-center justify-end gap-3">
         <a
@@ -675,13 +516,9 @@ export default function OnboardingForm({ programmes }: { programmes: Programme[]
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-[#6b1a2a] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#5a1522] disabled:opacity-60 transition-colors"
+          className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 transition-colors"
         >
-          {pending
-            ? "Creating…"
-            : sendInvite
-            ? "Create Awardee & Send Invite"
-            : "Create Awardee & Grant"}
+          {pending ? "Saving…" : "Create Awardee & Grant"}
         </button>
       </div>
     </form>
