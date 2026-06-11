@@ -1,6 +1,7 @@
 import { login } from "@/app/auth/actions";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import Link from "next/link";
+import Image from "next/image";
 
 interface LoginPageProps {
   searchParams: Promise<{ error?: string }>;
@@ -14,10 +15,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <div className="w-full max-w-md px-4">
         {/* Logo */}
         <div className="text-center mb-8">
-          <img
+          <Image
             src="/logo.png"
             alt="GrantsFlow"
-            className="mx-auto h-28 w-auto mb-4"
+            width={200}
+            height={64}
+            className="mx-auto h-16 w-auto mb-4"
+            priority
           />
           <p className="mt-2 text-xs font-semibold tracking-widest text-gray-400 uppercase">
             Funding. Transparency. Impact.

@@ -44,10 +44,21 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   other:                   "Other",
 };
 
-type ExpiryStatus = "expired" | "expiring_soon" | "active" | "no_expiry";
+// Document types that must always have an expiry date
+const MUST_HAVE_EXPIRY: Set<string> = new Set([
+  "ethics_clearance",
+  "tax_clearance",
+  "research_permit",
+  "insurance",
+]);
 
-function getExpiryStatus(expiresAt: string | null): ExpiryStatus {
-  if (!expiresAt) return "no_expiry";
+type ExpiryStatus = "expired" | "expiring_soon" | "active" | "no_expiry" | "missing_expiry";
+
+function getExpiryStatus(expiresAt: string | null, documentType?: string | null): ExpiryStatus {
+  if (!expiresAt) {
+    if (documentType && MUST_HAVE_EXPIRY.has(documentType)) return "missing_expiry";
+    return "no_expiry";
+  }
   const today = new Date();
   const exp   = new Date(expiresAt + "T00:00:00");
   const days  = Math.ceil((exp.getTime() - today.getTime()) / 86_400_000);
@@ -106,7 +117,7 @@ function DocTable({ items }: { items: ComplianceDoc[] }) {
         </thead>
         <tbody className="divide-y divide-gray-50">
           {items.map((doc) => {
-            const status = getExpiryStatus(doc.expires_at);
+            const status = getExpiryStatus(doc.expires_at, doc.document_type);
             const days   = daysUntilExpiry(doc.expires_at);
             const grant  = Array.isArray(doc.grants) ? doc.grants[0] : doc.grants;
             return (
@@ -146,6 +157,9 @@ function DocTable({ items }: { items: ComplianceDoc[] }) {
                   )}
                   {status === "no_expiry" && (
                     <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">No expiry</span>
+                  )}
+                  {status === "missing_expiry" && (
+                    <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-700">Expiry required</span>
                   )}
                 </td>
                 <td className="px-4 py-3.5 text-right">
@@ -190,10 +204,11 @@ export default async function CompliancePage() {
   const reports    = (reportsRes.data ?? [])    as unknown as ReportRow[];
 
   // ── Document groups ──────────────────────────────────────────────────────
-  const expired      = compliance.filter((d) => getExpiryStatus(d.expires_at) === "expired");
-  const expiringSoon = compliance.filter((d) => getExpiryStatus(d.expires_at) === "expiring_soon");
-  const active       = compliance.filter((d) => getExpiryStatus(d.expires_at) === "active");
-  const noExpiry     = compliance.filter((d) => getExpiryStatus(d.expires_at) === "no_expiry");
+  const expired      = compliance.filter((d) => getExpiryStatus(d.expires_at, d.document_type) === "expired");
+  const expiringSoon = compliance.filter((d) => getExpiryStatus(d.expires_at, d.document_type) === "expiring_soon");
+  const active       = compliance.filter((d) => getExpiryStatus(d.expires_at, d.document_type) === "active");
+  const noExpiry     = compliance.filter((d) => getExpiryStatus(d.expires_at, d.document_type) === "no_expiry");
+  const missingExpiry = compliance.filter((d) => getExpiryStatus(d.expires_at, d.document_type) === "missing_expiry");
   const validDocs    = active.length + noExpiry.length;
 
   // ── Portfolio compliance score ────────────────────────────────────────────

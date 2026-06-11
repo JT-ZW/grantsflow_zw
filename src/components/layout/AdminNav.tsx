@@ -1,5 +1,6 @@
 import { logout } from "@/app/auth/actions";
 import Link from "next/link";
+import Image from "next/image";
 import { NavLinks } from "./NavLinks";
 import NotificationBell from "./NotificationBell";
 import MobileNav from "./MobileNav";
@@ -12,7 +13,7 @@ export default function AdminNav() {
           {/* Left: logo + desktop nav */}
           <div className="flex items-center gap-7">
             <Link href="/dashboard" className="shrink-0">
-              <img src="/logo.png" alt="GrantsFlow" className="h-8 w-auto" />
+              <Image src="/logo.png" alt="GrantsFlow" width={120} height={32} className="h-8 w-auto" priority />
             </Link>
             {/* Desktop nav — hidden on mobile */}
             <div className="hidden lg:block">

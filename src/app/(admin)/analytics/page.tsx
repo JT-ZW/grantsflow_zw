@@ -154,18 +154,20 @@ export default async function AnalyticsPage() {
   for (const g of grants) currencyCounts[g.currency_code] = (currencyCounts[g.currency_code] ?? 0) + 1;
   const dominantCurrency = Object.entries(currencyCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "USD";
 
-  // -- Milestone metrics ----------------------------------------------------
-  const msTotal     = milestones.length;
-  const msCompleted = milestones.filter((m) => m.status === "completed").length;
-  const msDelayed   = milestones.filter((m) => m.status === "delayed").length;
-  const msOverdue   = milestones.filter((m) => m.status !== "completed" && new Date(m.due_date) < today).length;
-  const msOnTrack   = milestones.filter((m) => m.status !== "completed" && m.status !== "delayed" && new Date(m.due_date) >= today).length;
+  // -- Milestone metrics (scoped to active grants only for accurate completion rate) ----
+  const activeGrantIds = new Set(activeGrants.map((g) => g.id));
+  const activeMilestones = milestones.filter((m) => activeGrantIds.has(m.grant_id));
+  const msTotal     = activeMilestones.length;
+  const msCompleted = activeMilestones.filter((m) => m.status === "completed").length;
+  const msDelayed   = activeMilestones.filter((m) => m.status === "delayed").length;
+  const msOverdue   = activeMilestones.filter((m) => m.status !== "completed" && new Date(m.due_date) < today).length;
+  const msOnTrack   = activeMilestones.filter((m) => m.status !== "completed" && m.status !== "delayed" && new Date(m.due_date) >= today).length;
   const msRate      = msTotal > 0 ? Math.round((msCompleted / msTotal) * 100) : 0;
   const ringColor   = msRate >= 70 ? "#16a34a" : msRate >= 35 ? "#d97706" : "#dc2626";
 
-  // -- Report compliance ----------------------------------------------------
+  // -- Report compliance (submitted + under_review + approved = compliant) --
   const dueReports       = reports.filter((r) => new Date(r.due_date) < today);
-  const submittedReports = dueReports.filter((r) => r.status === "submitted" || r.status === "approved");
+  const submittedReports = dueReports.filter((r) => ["submitted", "under_review", "approved"].includes(r.status));
   const complianceRate   = dueReports.length > 0 ? Math.round((submittedReports.length / dueReports.length) * 100) : null;
 
   // -- Disbursement trend (last 6 months) -----------------------------------

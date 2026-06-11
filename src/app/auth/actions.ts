@@ -30,7 +30,13 @@ export async function login(formData: FormData) {
     redirect("/portal");
   }
 
-  redirect("/dashboard");
+  // Redirect non-awardee known roles to dashboard; unknown roles go to login
+  const adminRoles = ["admin", "program_manager", "finance_officer", "auditor"];
+  if (profile?.role && adminRoles.includes(profile.role)) {
+    redirect("/dashboard");
+  }
+
+  redirect("/auth/login?error=Your+account+does+not+have+access+to+this+system");
 }
 
 export async function logout() {
@@ -57,6 +63,15 @@ export async function requestPasswordReset(formData: FormData) {
   redirect("/auth/forgot-password?success=1");
 }
 
+// Shared password strength check
+function validatePasswordStrength(password: string): string | null {
+  if (password.length < 8) return "Password must be at least 8 characters";
+  if (!/[A-Z]/.test(password)) return "Password must contain at least one uppercase letter";
+  if (!/[0-9]/.test(password)) return "Password must contain at least one number";
+  if (!/[^A-Za-z0-9]/.test(password)) return "Password must contain at least one special character";
+  return null;
+}
+
 export async function setPassword(formData: FormData) {
   const password = formData.get("password") as string;
   const confirmPassword = formData.get("confirm_password") as string;
@@ -65,8 +80,9 @@ export async function setPassword(formData: FormData) {
     redirect("/auth/set-password?error=Passwords+do+not+match");
   }
 
-  if (password.length < 8) {
-    redirect("/auth/set-password?error=Password+must+be+at+least+8+characters");
+  const strengthError = validatePasswordStrength(password);
+  if (strengthError) {
+    redirect(`/auth/set-password?error=${encodeURIComponent(strengthError)}`);
   }
 
   const supabase = await createClient();

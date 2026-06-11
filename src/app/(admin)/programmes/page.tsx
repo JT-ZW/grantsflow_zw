@@ -389,6 +389,25 @@ export default async function ProgrammesPage() {
           })}
         </div>
       )}
+
+      {/* Unassigned grants notice */}
+      {(() => {
+        const unassignedGrants = (grantData ?? []).filter(
+          (g: { programme_id: string | null }) => !g.programme_id
+        );
+        if (unassignedGrants.length === 0) return null;
+        return (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
+            <p className="text-sm font-semibold text-amber-900">
+              {unassignedGrants.length} grant{unassignedGrants.length !== 1 ? "s" : ""} not assigned to a programme
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              These grants are not linked to any programme and will not appear in programme budgets or reporting.
+              Open each grant and assign it to a programme to include it.
+            </p>
+          </div>
+        );
+      })()}
     </div>
   );
 }

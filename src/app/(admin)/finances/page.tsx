@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 function fmt(amount: number, currency = "USD") {
   return `${currency} ${amount.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`;
@@ -30,7 +31,7 @@ export default async function FinancesPage() {
       supabase
         .from("disbursement_requests")
         .select("id, grant_id, amount, currency_code, status, justification, created_at")
-        .eq("status", "pending")
+        .in("status", ["pending", "approved"])
         .order("created_at", { ascending: false }),
     ]);
 
@@ -38,12 +39,14 @@ export default async function FinancesPage() {
   const budgets = budgetsRes.data ?? [];
   const disbursements = disbursementsRes.data ?? [];
   const expenses = expensesRes.data ?? [];
-  const pendingDisbRequests = disbRequestsRes.data ?? [];
+  const allDisbRequests = disbRequestsRes.data ?? [];
+  const pendingDisbRequests = allDisbRequests.filter((r: { status: string }) => r.status === "pending");
+  const approvedDisbRequests = allDisbRequests.filter((r: { status: string }) => r.status === "approved");
 
-  // Portfolio-wide totals
+  // Portfolio-wide totals — sum across ALL grants per awardee
   const totalAwarded = awardees.reduce((s, a) => {
     const grants = a.grants as { amount_awarded: number }[] | null;
-    return s + (grants?.[0]?.amount_awarded ?? 0);
+    return s + (grants ?? []).reduce((gs, g) => gs + Number(g.amount_awarded ?? 0), 0);
   }, 0);
   const totalBudgeted = budgets
     .filter((b) => b.approved)
@@ -149,6 +152,43 @@ export default async function FinancesPage() {
           </div>
         );
       })()}
+
+      {/* Approved disbursement requests awaiting processing */}
+      {approvedDisbRequests.length > 0 && (
+        <div className="rounded-xl border border-green-200 bg-green-50 p-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-green-900">
+              Approved Requests Awaiting Payment ({approvedDisbRequests.length})
+            </h2>
+          </div>
+          <div className="space-y-2">
+            {approvedDisbRequests.slice(0, 6).map((req: { id: string; grant_id: string; amount: number; currency_code: string; created_at: string }) => {
+              const awardee = awardees.find((a) => {
+                const grants = a.grants as { id: string }[] | null;
+                return (grants ?? []).some((g) => g.id === req.grant_id);
+              });
+              return (
+                <div
+                  key={req.id}
+                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-lg bg-white border border-green-100 px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{awardee?.full_name ?? "Unknown"}</p>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <p className="text-sm font-semibold text-gray-900">{fmt(Number(req.amount), req.currency_code)}</p>
+                    {awardee && (
+                      <Link href={`/awardees/${awardee.id}/finances`} className="text-xs font-medium text-green-700 hover:underline whitespace-nowrap">
+                        Process →
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Pending disbursement requests from awardees */}
       {pendingDisbRequests.length > 0 && (
@@ -258,7 +298,7 @@ export default async function FinancesPage() {
       <div className="rounded-xl border border-gray-200 bg-white p-6">
         <h2 className="text-base font-semibold text-gray-900 mb-4">By Awardee</h2>
         {awardeeRows.length === 0 ? (
-          <p className="text-sm text-gray-400">No awardees with grants yet.</p>
+          <EmptyState title="No awardees with grants yet." description="Awardee financial data will appear here once grants are created." />
         ) : (
           <div className="overflow-x-auto -mx-6">
             <div className="inline-block min-w-full align-middle px-6">
@@ -351,7 +391,7 @@ export default async function FinancesPage() {
       <div className="rounded-xl border border-gray-200 bg-white p-6">
         <h2 className="text-base font-semibold text-gray-900 mb-4">Recent Disbursements</h2>
         {disbursements.length === 0 ? (
-          <p className="text-sm text-gray-400">No disbursements recorded yet.</p>
+          <EmptyState title="No disbursements recorded yet." description="Disbursements will appear here once payments are processed." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

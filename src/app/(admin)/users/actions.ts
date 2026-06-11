@@ -7,6 +7,15 @@ import { z } from "zod";
 
 const ALLOWED_ROLES = ["admin", "program_manager", "finance_officer", "auditor", "awardee"] as const;
 
+// Shared password strength validation
+function validatePasswordStrength(password: string): string | null {
+  if (password.length < 8) return "Password must be at least 8 characters";
+  if (!/[A-Z]/.test(password)) return "Password must contain at least one uppercase letter";
+  if (!/[0-9]/.test(password)) return "Password must contain at least one number";
+  if (!/[^A-Za-z0-9]/.test(password)) return "Password must contain at least one special character";
+  return null;
+}
+
 // ── Guard: caller must be admin ───────────────────────────────────────────────
 async function requireAdmin() {
   const supabase = await createClient();
@@ -110,6 +119,9 @@ export async function createUser(_prev: CreateUserState, formData: FormData): Pr
   }
 
   const { email, full_name, role, password } = parsed.data;
+
+  const strengthError = validatePasswordStrength(password);
+  if (strengthError) return { error: strengthError };
   const admin = createAdminClient();
 
   // Check if email already exists
@@ -246,6 +258,9 @@ export async function changeUserPassword(
 
   const { profile_id, password } = parsed.data;
   if (profile_id === actor.id) return { error: "Use your account settings to change your own password." };
+
+  const strengthError = validatePasswordStrength(password);
+  if (strengthError) return { error: strengthError };
 
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.updateUserById(profile_id, { password });

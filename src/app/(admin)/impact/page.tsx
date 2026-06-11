@@ -28,10 +28,10 @@ export default async function ImpactPage() {
   const supabase = createAdminClient();
 
   // Fetch all grants with impact classification fields
-  const [{ data: grants }, { data: awardeeGenders }] = await Promise.all([
+  const [{ data: grants }, { data: awardeeGendersRaw }] = await Promise.all([
     supabase
       .from("grants")
-      .select("id, title, status, sectors, sdg_goals, country_codes, geographic_scope, amount_awarded, currency_code")
+      .select("id, title, status, sectors, sdg_goals, country_codes, geographic_scope, amount_awarded, currency_code, awardee_id")
       .not("status", "eq", "cancelled"),
     supabase
       .from("awardees")
@@ -40,6 +40,10 @@ export default async function ImpactPage() {
 
   const allGrants = grants ?? [];
   const activeGrants = allGrants.filter((g) => g.status === "active");
+
+  // Scope gender to awardees that have at least one non-cancelled grant
+  const activeAwardeeIds = new Set(allGrants.map((g: { awardee_id: string }) => g.awardee_id));
+  const awardeeGenders = (awardeeGendersRaw ?? []).filter((a: { id: string }) => activeAwardeeIds.has(a.id));
 
   // Aggregate sectors
   const sectorCounts: Record<string, number> = {};
@@ -66,27 +70,28 @@ export default async function ImpactPage() {
   }
   const activeCountryCodes = Object.keys(grantsByCountry);
 
-  // Aggregate gender breakdown
+  // Aggregate gender breakdown — Male/Female only
   const genderRaw = (awardeeGenders ?? []) as { id: string; gender: string | null }[];
   const genderCounts = {
-    female:          genderRaw.filter((a) => a.gender === "female").length,
-    male:            genderRaw.filter((a) => a.gender === "male").length,
-    non_binary:      genderRaw.filter((a) => a.gender === "non_binary").length,
-    prefer_not_to_say: genderRaw.filter((a) => a.gender === "prefer_not_to_say").length,
-    unspecified:     genderRaw.filter((a) => !a.gender || a.gender === "").length,
+    female:      genderRaw.filter((a) => a.gender === "female").length,
+    male:        genderRaw.filter((a) => a.gender === "male").length,
+    unspecified: genderRaw.filter((a) => !a.gender || (a.gender !== "female" && a.gender !== "male")).length,
   };
   const totalAwardees = genderRaw.length;
 
-  // Fetch indicators + actuals for Layer 2 summary
+  // Fetch indicators + actuals for Layer 2 summary (exclude cancelled grants)
+  const activeCancelledExcludedIds = allGrants.map((g: { id: string }) => g.id);
   const { data: indicators } = await supabase
     .from("grant_impact_indicators")
-    .select("id, label, unit, target_value, impact_submissions(actual_value)");
+    .select("id, label, unit, target_value, impact_submissions(actual_value), grant_id");
 
-  const indicatorSummary = (indicators ?? []).map((ind) => {
-    const subs = (ind.impact_submissions as { actual_value: number }[] | null) ?? [];
-    const total = subs.reduce((s, r) => s + (r.actual_value ?? 0), 0);
-    return { label: ind.label, unit: ind.unit, target: ind.target_value, actual: total };
-  });
+  const indicatorSummary = (indicators ?? [])
+    .filter((ind: { grant_id: string }) => activeCancelledExcludedIds.includes(ind.grant_id))
+    .map((ind: { label: string; unit: string; target_value: number; impact_submissions: { actual_value: number }[] | null }) => {
+      const subs = (ind.impact_submissions as { actual_value: number }[] | null) ?? [];
+      const total = subs.reduce((s, r) => s + (r.actual_value ?? 0), 0);
+      return { label: ind.label, unit: ind.unit, target: ind.target_value, actual: total };
+    });
 
   // Fetch latest impact stories for Layer 3 narrative feed
   const { data: stories } = await supabase
@@ -217,17 +222,16 @@ export default async function ImpactPage() {
         </Card>
       )}
 
-      {/* Gender breakdown */}
+      {/* Gender breakdown — Male / Female */}
       {totalAwardees > 0 && (
         <Card className="p-6">
           <h2 className="text-sm font-semibold text-gray-900 mb-1">Gender Breakdown</h2>
-          <p className="text-xs text-gray-400 mb-5">Disaggregated by awardee gender across all registered awardees.</p>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
+          <p className="text-xs text-gray-400 mb-5">Disaggregated by awardee gender (awardees with active grants).</p>
+          <div className="grid grid-cols-3 gap-4 mb-6">
             {[
-              { label: "Female-led",    count: genderCounts.female,          color: "#be185d" },
-              { label: "Male-led",      count: genderCounts.male,            color: "#1d4ed8" },
-              { label: "Non-binary",    count: genderCounts.non_binary,      color: "#7c3aed" },
-              { label: "Undisclosed",   count: genderCounts.prefer_not_to_say + genderCounts.unspecified, color: "#6b7280" },
+              { label: "Female",       count: genderCounts.female,      color: "#be185d" },
+              { label: "Male",         count: genderCounts.male,        color: "#1d4ed8" },
+              { label: "Not Specified",count: genderCounts.unspecified, color: "#6b7280" },
             ].map((g) => {
               const pct = totalAwardees > 0 ? Math.round((g.count / totalAwardees) * 100) : 0;
               return (

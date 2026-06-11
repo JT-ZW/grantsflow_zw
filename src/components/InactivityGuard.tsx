@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 const INACTIVITY_LIMIT_MS = 20 * 60 * 1000; // 20 minutes
 const CHECK_INTERVAL_MS = 30 * 1000; // check every 30 seconds
 const STORAGE_KEY = "grantflow_last_activity";
+const CHANNEL_NAME = "grantflow_activity";
 
 const ACTIVITY_EVENTS = [
   "mousemove",
@@ -20,10 +21,14 @@ const ACTIVITY_EVENTS = [
 export default function InactivityGuard() {
   const router = useRouter();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const channelRef = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
     function recordActivity() {
-      localStorage.setItem(STORAGE_KEY, Date.now().toString());
+      const now = Date.now().toString();
+      localStorage.setItem(STORAGE_KEY, now);
+      // Broadcast activity to all other tabs so they don't time out
+      channelRef.current?.postMessage({ type: "activity", ts: now });
     }
 
     async function checkInactivity() {
@@ -45,6 +50,17 @@ export default function InactivityGuard() {
       }
     }
 
+    // Cross-tab activity sync via BroadcastChannel
+    if (typeof BroadcastChannel !== "undefined") {
+      channelRef.current = new BroadcastChannel(CHANNEL_NAME);
+      channelRef.current.onmessage = (event) => {
+        if (event.data?.type === "activity" && event.data?.ts) {
+          // Another tab was active — update this tab's timestamp too
+          localStorage.setItem(STORAGE_KEY, event.data.ts);
+        }
+      };
+    }
+
     // Stamp activity on load
     recordActivity();
 
@@ -64,6 +80,7 @@ export default function InactivityGuard() {
         window.removeEventListener(event, recordActivity)
       );
       if (intervalRef.current) clearInterval(intervalRef.current);
+      channelRef.current?.close();
     };
   }, [router]);
 

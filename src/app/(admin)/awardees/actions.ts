@@ -11,7 +11,7 @@ const onboardingSchema = z.object({
   email: z.string().email("Valid email is required"),
   phone: z.string().optional(),
   awardee_type: z.enum(["individual", "team", "organization"]),
-  gender: z.enum(["female", "male", "non_binary", "prefer_not_to_say"]).optional(),
+  gender: z.enum(["female", "male"]).optional(),
   student_number: z.string().optional(),
   department: z.string().optional(),
   faculty: z.string().optional(),
@@ -90,12 +90,22 @@ export async function createAwardeeAndGrant(
   }
 
   // 2. Create grant
+  const VALID_ISO3_CODES = new Set([
+    "DZA","AGO","BEN","BWA","BFA","BDI","CPV","CMR","CAF","TCD","COM","COD","COG","CIV",
+    "DJI","EGY","GNQ","ERI","SWZ","ETH","GAB","GMB","GHA","GIN","GNB","KEN","LSO","LBR",
+    "LBY","MDG","MWI","MLI","MRT","MUS","MAR","MOZ","NAM","NER","NGA","RWA","STP","SEN",
+    "SLE","SOM","ZAF","SSD","SDN","TZA","TGO","TUN","UGA","ZMB","ZWE",
+  ]);
+
   let sectors: string[] = [];
   let sdgGoals: number[] = [];
   let countryCodes: string[] = [];
   try { sectors     = JSON.parse(d.sectors_json     ?? "[]"); } catch { /* ignore */ }
   try { sdgGoals    = JSON.parse(d.sdg_goals_json   ?? "[]"); } catch { /* ignore */ }
-  try { countryCodes = JSON.parse(d.country_codes_json ?? "[]"); } catch { /* ignore */ }
+  try {
+    const raw: unknown[] = JSON.parse(d.country_codes_json ?? "[]");
+    countryCodes = raw.filter((c): c is string => typeof c === "string" && VALID_ISO3_CODES.has(c));
+  } catch { /* ignore */ }
 
   const { data: grant, error: grantError } = await supabase
     .from("grants")

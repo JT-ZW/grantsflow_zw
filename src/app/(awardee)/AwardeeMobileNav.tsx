@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/auth/actions";
 
@@ -14,6 +15,7 @@ const navItems = [
   { label: "Reports",       href: "/portal/reports" },
   { label: "Documents",     href: "/portal/documents" },
   { label: "Messages",      href: "/portal/messages" },
+  { label: "Profile",       href: "/portal/profile" },
 ];
 
 export default function AwardeeMobileNav() {
@@ -36,7 +38,7 @@ export default function AwardeeMobileNav() {
 
       <div className={`fixed top-0 left-0 z-50 h-full w-64 max-w-[85vw] bg-white shadow-xl transform transition-transform duration-300 ${open ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-4">
-          <img src="/logo.png" alt="GrantsFlow" className="h-8 w-auto" />
+          <Image src="/logo.png" alt="GrantsFlow" width={80} height={32} className="h-8 w-auto" />
           <button onClick={() => setOpen(false)} className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100" aria-label="Close menu">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

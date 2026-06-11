@@ -13,6 +13,7 @@ const navItems = [
   { label: "Reports",       href: "/portal/reports" },
   { label: "Documents",     href: "/portal/documents" },
   { label: "Messages",      href: "/portal/messages" },
+  { label: "Profile",       href: "/portal/profile" },
 ];
 
 export default function AwardeeDesktopNav() {

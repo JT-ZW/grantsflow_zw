@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/auth/actions";
 
@@ -50,7 +51,7 @@ export default function MobileNav() {
       >
         {/* Drawer header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-4">
-          <img src="/logo.png" alt="GrantsFlow" className="h-8 w-auto" />
+          <Image src="/logo.png" alt="GrantsFlow" width={80} height={32} className="h-8 w-auto" />
           <button
             onClick={() => setOpen(false)}
             className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100"

@@ -64,7 +64,7 @@ export default async function PortalPage() {
     );
   }
 
-  const grant = (awardee.grants as {
+  const allGrants = (awardee.grants as {
     id: string; title: string; description: string | null;
     grant_type: string; status: string; amount_awarded: number;
     currency_code: string; start_date: string; end_date: string;
@@ -73,7 +73,10 @@ export default async function PortalPage() {
       deliverables: string | null; due_date: string; status: string;
       progress_notes: string | null; completion_pct: number | null; sort_order: number;
     }[];
-  }[])?.[0];
+  }[]) ?? [];
+
+  // Show the most recently active grant first, or the first grant if none are active
+  const grant = allGrants.find((g) => g.status === "active") ?? allGrants[0];
 
   const milestones = (grant?.milestones ?? []).sort((a, b) => a.sort_order - b.sort_order);
 
@@ -90,6 +93,7 @@ export default async function PortalPage() {
   const completedCount = milestones.filter((m) => m.status === "completed").length;
   const inProgressCount = milestones.filter((m) => m.status === "in_progress").length;
   const delayedCount = milestones.filter((m) => m.status === "delayed").length;
+  // overdueCount: past due date AND not completed AND not already formally delayed (avoid double-count)
   const overdueCount = milestones.filter(
     (m) => m.status !== "completed" && m.status !== "delayed" && new Date(m.due_date) < today
   ).length;
@@ -111,12 +115,15 @@ export default async function PortalPage() {
       )))
     : null;
 
-  // Next actionable milestone (not completed/delayed, nearest due date)
+  // Next actionable milestone: include delayed (they need attention too), nearest due date
   const nextMilestone = milestones
-    .filter((m) => m.status !== "completed" && m.status !== "delayed")
+    .filter((m) => m.status !== "completed")
     .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())[0] ?? null;
 
-  const firstName = awardee.full_name.split(" ")[0];
+  // Safe firstName: skip honorifics like "Dr.", "Prof.", "Mr.", "Ms."
+  const HONORIFICS = new Set(["dr.", "prof.", "mr.", "ms.", "mrs.", "miss", "rev."]);
+  const nameParts = awardee.full_name.trim().split(/\s+/);
+  const firstName = (HONORIFICS.has(nameParts[0]?.toLowerCase()) ? nameParts[1] : nameParts[0]) ?? nameParts[0];
 
   return (
     <div className="space-y-6">
@@ -141,6 +148,14 @@ export default async function PortalPage() {
           </span>
         )}
       </div>
+
+      {/* Multi-grant notice */}
+      {allGrants.length > 1 && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          You have <strong>{allGrants.length}</strong> grants on your account. Showing your active grant below.
+          Please contact the grants office to view details for your other grants.
+        </div>
+      )}
 
       {!grant && (
         <div className="rounded-xl border border-dashed border-gray-200 bg-white p-10 text-center">

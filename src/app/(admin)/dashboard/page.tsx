@@ -5,10 +5,10 @@ export const dynamic = "force-dynamic";
 
 /* ─── helpers ────────────────────────────────────────────────────────────── */
 
-function fmtMoney(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}k`;
-  return `$${n.toLocaleString()}`;
+function fmtMoney(n: number, currency = "ZiG"): string {
+  if (n >= 1_000_000) return `${currency} ${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${currency} ${(n / 1_000).toFixed(1)}k`;
+  return `${currency} ${n.toLocaleString("en-ZA")}`;
 }
 
 function relDate(dateStr: string): string {
@@ -222,18 +222,30 @@ export default async function DashboardPage() {
     return e >= today && e <= in30;
   }).length;
 
-  /* compliance score */
+  /* compliance score — reportHealth counts submitted + under_review + approved */
   const milestoneHealth = totalMs > 0 ? Math.round(((totalMs - delayedMs) / totalMs) * 100) : 100;
-  const approvedGrantSet = new Set(reports.filter((r) => r.status === "approved").map((r) => r.grant_id));
-  const reportHealth = activeGrants.length > 0 ? Math.round((approvedGrantSet.size / activeGrants.length) * 100) : 100;
+  const compliantReportGrantSet = new Set(
+    reports
+      .filter((r) => ["submitted", "under_review", "approved"].includes(r.status))
+      .map((r) => r.grant_id)
+  );
+  const reportHealth = activeGrants.length > 0
+    ? Math.round((compliantReportGrantSet.size / activeGrants.length) * 100)
+    : 100;
   const docHealth = compDocs.length > 0 ? Math.round(((compDocs.length - expiredDocs) / compDocs.length) * 100) : 100;
   const complianceScore = Math.round(0.4 * milestoneHealth + 0.4 * reportHealth + 0.2 * docHealth);
   const complianceColor = complianceScore >= 80 ? "#059669" : complianceScore >= 60 ? "#d97706" : "#dc2626";
   const complianceLabel = complianceScore >= 80 ? "Healthy" : complianceScore >= 60 ? "Needs Attention" : "Critical";
 
-  /* at-risk grants */
+  /* at-risk grants — includes formally delayed AND milestones overdue (past due date, not completed) */
   const atRiskGrants = activeGrants
-    .filter((g) => g.milestones.some((m) => m.status === "delayed"))
+    .filter((g) =>
+      g.milestones.some(
+        (m) =>
+          m.status === "delayed" ||
+          (m.status !== "completed" && new Date((m as unknown as { due_date: string }).due_date ?? "9999") < today)
+      )
+    )
     .slice(0, 5);
 
   /* upcoming milestones */
@@ -255,7 +267,16 @@ export default async function DashboardPage() {
     .sort((a, b) => b.awarded - a.awarded);
   const uncatAmount = grants.filter((g) => !g.programme_id).reduce((s, g) => s + Number(g.amount_awarded ?? 0), 0);
 
-  /* monthly spend (last 6 months) */
+  /* dominant currency across portfolio */
+  const currencyCounts: Record<string, number> = {};
+  for (const g of grants) {
+    const cc = g.currency_code ?? "ZiG";
+    currencyCounts[cc] = (currencyCounts[cc] ?? 0) + 1;
+  }
+  const dominantCurrency = Object.entries(currencyCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "ZiG";
+  const multiCurrency = Object.keys(currencyCounts).length > 1;
+
+  /* monthly spend (last 6 months) — use disbursement_date for accuracy */
   const months6 = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(today);
     d.setMonth(d.getMonth() - (5 - i));
@@ -315,8 +336,10 @@ export default async function DashboardPage() {
           <div className="absolute -bottom-6 -right-6 h-24 w-24 rounded-full border-[6px] border-white/10" />
           <div className="absolute -bottom-2 -right-2 h-12 w-12 rounded-full border-[4px] border-white/10" />
           <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-red-200/80 mb-2">Total Portfolio</p>
-          <p className="text-4xl font-extrabold tracking-tight">{fmtMoney(totalPortfolio)}</p>
-          <p className="mt-2 text-xs text-red-200/60 font-medium">All grants allocated</p>
+          <p className="text-4xl font-extrabold tracking-tight">{fmtMoney(totalPortfolio, dominantCurrency)}</p>
+          <p className="mt-2 text-xs text-red-200/60 font-medium">
+            {multiCurrency ? "Mixed currencies — shown in dominant" : "All grants allocated"}
+          </p>
         </Link>
 
         {/* Active Grants */}
@@ -339,7 +362,7 @@ export default async function DashboardPage() {
             </div>
             <span className="text-[10px] font-semibold text-gray-400 bg-gray-50 rounded-full px-2 py-0.5">{utilizationPct}% used</span>
           </div>
-          <p className="text-3xl font-extrabold tracking-tight text-gray-900">{fmtMoney(totalDisbursed)}</p>
+          <p className="text-3xl font-extrabold tracking-tight text-gray-900">{fmtMoney(totalDisbursed, dominantCurrency)}</p>
           <p className="mt-1 text-[11px] font-medium text-gray-400 uppercase tracking-wide">Disbursed</p>
         </Link>
 
@@ -410,9 +433,9 @@ export default async function DashboardPage() {
 
           <div className="grid grid-cols-3 gap-4 mb-6">
             {[
-              { label: "Allocated", value: fmtMoney(totalPortfolio), color: "text-gray-900" },
-              { label: "Disbursed", value: fmtMoney(totalDisbursed), color: "text-[#6b1a2a]" },
-              { label: "Remaining", value: fmtMoney(Math.max(0, totalPortfolio - totalDisbursed)), color: "text-gray-300" },
+              { label: "Allocated", value: fmtMoney(totalPortfolio, dominantCurrency), color: "text-gray-900" },
+              { label: "Disbursed", value: fmtMoney(totalDisbursed, dominantCurrency), color: "text-[#6b1a2a]" },
+              { label: "Remaining", value: fmtMoney(Math.max(0, totalPortfolio - totalDisbursed), dominantCurrency), color: "text-gray-300" },
             ].map(({ label, value, color }) => (
               <div key={label} className="rounded-xl bg-gray-50 p-3.5">
                 <p className={`text-xl font-extrabold tracking-tight ${color}`}>{value}</p>

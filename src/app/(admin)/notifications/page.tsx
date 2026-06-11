@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { markAllRead, markNotificationRead } from "./actions";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const TYPE_ICONS: Record<string, string> = {
   milestone_due:                 "⏰",
@@ -66,10 +67,11 @@ export default async function NotificationsPage() {
 
       <div className="rounded-xl border border-gray-200 bg-white divide-y divide-gray-100 overflow-hidden">
         {items.length === 0 ? (
-          <div className="p-10 text-center text-sm text-gray-400">
-            No notifications yet. They&apos;ll appear here when milestones are due,
-            expenses are submitted, or grants change status.
-          </div>
+          <EmptyState
+            title="No notifications yet."
+            description="Notifications appear here when milestones are due, expenses are submitted, or grants change status."
+            className="rounded-none border-0"
+          />
         ) : (
           items.map((n) => (
             <div

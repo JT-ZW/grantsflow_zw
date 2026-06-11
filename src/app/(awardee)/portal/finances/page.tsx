@@ -13,7 +13,7 @@ const EXPENSE_CATEGORIES = [
   "Other",
 ];
 
-const CURRENCIES = ["ZAR", "USD", "EUR", "GBP"];
+const CURRENCIES = ["ZiG", "ZAR", "USD", "EUR", "GBP"];
 
 const EXPENSE_STATUS: Record<string, { badge: string; label: string }> = {
   pending:  { badge: "bg-yellow-100 text-yellow-700", label: "Pending Review" },

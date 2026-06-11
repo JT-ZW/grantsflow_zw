@@ -63,7 +63,7 @@ export async function awardeeUpdateMilestoneStatus(formData: FormData) {
   const { data: staffProfiles } = await adminClient
     .from("profiles")
     .select("id")
-    .in("role", ["admin", "program_manager"]);
+    .in("role", ["admin", "program_manager", "finance_officer", "auditor"]);
 
   if (staffProfiles && staffProfiles.length > 0) {
     const awardee_name  = ms.grants?.awardees?.full_name ?? "Awardee";
@@ -160,10 +160,19 @@ export async function submitMilestoneProgress(formData: FormData) {
     ...(impact_story ? { impact_story } : {}),
   }).select("id").single();
 
-  // Save indicator actuals if provided
+  // Save indicator actuals if provided — validate shape before inserting
   if (indicator_actuals_json && updateRow?.id) {
     try {
-      const actuals = JSON.parse(indicator_actuals_json) as { id: string; value: number; note: string }[];
+      const parsed = JSON.parse(indicator_actuals_json);
+      if (!Array.isArray(parsed)) throw new Error("Expected array");
+      const actualSchema = z.array(
+        z.object({
+          id:    z.string().uuid(),
+          value: z.number().finite().min(0),
+          note:  z.string().max(500).optional().default(""),
+        })
+      );
+      const actuals = actualSchema.parse(parsed);
       const rows = actuals
         .filter((a) => a.value > 0 || a.note)
         .map((a) => ({
@@ -174,7 +183,7 @@ export async function submitMilestoneProgress(formData: FormData) {
           submitted_by:        user.id,
         }));
       if (rows.length > 0) await supabase.from("impact_submissions").insert(rows);
-    } catch { /* non-fatal */ }
+    } catch { /* non-fatal: log only */ }
   }
 
   await supabase.from("audit_logs").insert({
@@ -191,7 +200,7 @@ export async function submitMilestoneProgress(formData: FormData) {
   const { data: staffProfiles } = await adminClient2
     .from("profiles")
     .select("id")
-    .in("role", ["admin", "program_manager"]);
+    .in("role", ["admin", "program_manager", "finance_officer", "auditor"]);
 
   if (staffProfiles && staffProfiles.length > 0) {
     const awardee_name = ms2.grants?.awardees?.full_name ?? "Awardee";

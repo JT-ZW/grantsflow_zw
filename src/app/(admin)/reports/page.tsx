@@ -1,5 +1,6 @@
 ﻿import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -74,29 +75,31 @@ export default async function ReportsPage() {
 
   const awardeeReportRows: AwardeeReportRow[] = [];
   for (const a of awardees) {
-    const grant = (a.grants ?? [])[0];
-    if (!grant) continue;
-    const grantRpts = grantReportMap[grant.id] ?? [];
-    const due       = grantRpts.filter((r) => new Date(r.due_date) < today);
-    const sub       = due.filter((r) => r.status === "submitted" || r.status === "approved");
-    const over      = due.filter((r) => r.status !== "submitted" && r.status !== "approved");
-    const latest    = grantRpts.find((r) => r.submitted_at) ?? null;
-    const upcoming  = grantRpts
-      .filter((r) => new Date(r.due_date) >= today)
-      .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())[0] ?? null;
+    // Iterate all grants (not just the first) so multi-grant awardees are fully covered
+    for (const grant of (a.grants ?? [])) {
+      if (!grant) continue;
+      const grantRpts = grantReportMap[grant.id] ?? [];
+      const due       = grantRpts.filter((r) => new Date(r.due_date) < today);
+      const sub       = due.filter((r) => ["submitted", "under_review", "approved"].includes(r.status));
+      const over      = due.filter((r) => !["submitted", "under_review", "approved"].includes(r.status));
+      const latest    = grantRpts.find((r) => r.submitted_at) ?? null;
+      const upcoming  = grantRpts
+        .filter((r) => new Date(r.due_date) >= today)
+        .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())[0] ?? null;
 
-    awardeeReportRows.push({
-      awardeeId:    a.id,
-      awardeeName:  a.full_name,
-      grantId:      grant.id,
-      grantTitle:   grant.title,
-      totalReports: grantRpts.length,
-      submitted:    sub.length,
-      overdue:      over.length,
-      lastSubmission: latest?.submitted_at ?? null,
-      nextDue:      upcoming?.due_date ?? null,
-      latestStatus: grantRpts[0]?.status ?? null,
-    });
+      awardeeReportRows.push({
+        awardeeId:    a.id,
+        awardeeName:  a.full_name,
+        grantId:      grant.id,
+        grantTitle:   grant.title,
+        totalReports: grantRpts.length,
+        submitted:    sub.length,
+        overdue:      over.length,
+        lastSubmission: latest?.submitted_at ?? null,
+        nextDue:      upcoming?.due_date ?? null,
+        latestStatus: grantRpts[0]?.status ?? null,
+      });
+    }
   }
 
   // Sort: overdue first, then by awardee name
@@ -179,6 +182,34 @@ export default async function ReportsPage() {
           </div>
         </Card>
       )}
+
+      {/* Revision-requested callout */}
+      {(() => {
+        const revisionRows = awardeeReportRows.filter((r) => r.latestStatus === "revision_requested");
+        if (revisionRows.length === 0) return null;
+        return (
+          <Card className="p-5 rounded-2xl border border-orange-200 bg-orange-50/80">
+            <div className="flex items-start gap-3">
+              <span className="text-orange-500 text-lg mt-0.5">↩</span>
+              <div>
+                <p className="text-sm font-semibold text-orange-900">
+                  {revisionRows.length} report{revisionRows.length !== 1 ? "s" : ""} awaiting resubmission
+                </p>
+                <p className="text-xs text-orange-600 mt-0.5">
+                  These awardees have been asked to revise their reports and have not yet resubmitted:
+                </p>
+                <ul className="mt-2 space-y-0.5">
+                  {revisionRows.map((r) => (
+                    <li key={r.grantId} className="text-xs text-orange-800 font-medium">
+                      · {r.awardeeName} — {r.grantTitle}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </Card>
+        );
+      })()}
 
       {/* Per-awardee report status */}
       {awardeeReportRows.length > 0 && (
@@ -358,7 +389,7 @@ export default async function ReportsPage() {
           Download a formatted PDF or open the full report in a new tab
         </p>
         {awardees.length === 0 ? (
-          <p className="text-sm text-gray-400">No awardees yet.</p>
+          <EmptyState title="No awardees yet." description="Reports will be available once awardees and grants are created." />
         ) : (
           <div className="divide-y divide-gray-100">
             {awardees.map((a) => {
